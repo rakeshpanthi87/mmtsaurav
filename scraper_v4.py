@@ -44,56 +44,61 @@ PINEWS_KEY      = os.environ.get('PINEWS_API_KEY',    '6b5856851f6e40ada902001df
 PINEWS_ENDPOINT = os.environ.get('PINEWS_ENDPOINT',   'https://api.apinews.net/news')
 MAX_RESULTS_PER_SOURCE = 50   # GNews pagination cap
 
-# ── Personalities ───────────────────────────────────────────────
-TARGETS = [
-    {
-        'name':       'बालेन शाह',
-        'name_en':    'Balen Shah',
-        'slug':       'balen-shah',
-        'search_terms': ['Balen Shah', 'Balendra Shah', 'बालेन शाह', 'Balen'],
-        'category':   'politician',
-        'bio':        'Mayor of Kathmandu — Rastriya Swatantra Party',
-        'keywords':   ['balen', 'balendra', 'kathmandu mayor', 'rsp'],
-    },
-    {
-        'name':       'प्रचण्ड',
-        'name_en':    'Prachanda',
-        'slug':       'prachanda',
-        'search_terms': ['Prachanda', 'Pushpa Kamal Dahal', 'प्रचण्ड', 'पुष्पकमल दाहाल'],
-        'category':   'politician',
-        'bio':        'Former Prime Minister — CPN (Maoist Centre)',
-        'keywords':   ['prachanda', 'maoist', 'dahal', 'pushpa'],
-    },
-    {
-        'name':       'केपी ओली',
-        'name_en':    'KP Oli',
-        'slug':       'kp-oli',
-        'search_terms': ['KP Oli', 'K.P. Oli', 'Khadga Prasad Oli', 'केपी ओली', 'खड्ग प्रसाद ओली'],
-        'category':   'politician',
-        'bio':        'Former Prime Minister — CPN-UML',
-        'keywords':   ['kp oli', 'k oli', 'khadga', 'cpn-uml'],
-    },
-    {
-        'name':       'गगन थापा',
-        'name_en':    'Gagan Thapa',
-        'slug':       'gagan-thapa',
-        'search_terms': ['Gagan Thapa', 'गगन थापा'],
-        'category':   'politician',
-        'bio':        'Member of Parliament — Nepali Congress',
-        'keywords':   ['gagan thapa', 'nepali congress'],
-    },
-    {
-        'name':       'हर्क साम्पाङ',
-        'name_en':    'Harka Sampang',
-        'slug':       'harka-sampang',
-        'search_terms': ['Harka Sampang', 'Harka Bahadur', 'हर्क साम्पाङ'],
-        'category':   'politician',
-        'bio':        'Mayor of Dharan — Independent',
-        'keywords':   ['harka sampang', 'dharan mayor'],
-    },
+
+TARGETS = []
+
+def load_targets():
+    global TARGETS
+    try:
+        import urllib.request, json
+        headers = {}
+        if API_SECRET:
+            headers['x-scraper-secret'] = API_SECRET
+        req = urllib.request.Request(f'{API_URL}/api/personalities', headers=headers)
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+            personas = data if isinstance(data, list) else data.get('personalities', data.get('data', []))
+        TARGETS = []
+        for p in personas:
+            name_en = p.get('name', '')
+            slug = p.get('slug', name_en.lower().replace(' ', '-'))
+            terms = [name_en] if name_en else []
+            parts = name_en.split()
+            if len(parts) >= 2:
+                terms.append(parts[0] + ' ' + parts[-1])
+            if len(parts) == 3:
+                terms.append(parts[0] + ' ' + parts[1])
+            if p.get('name_local'):
+                terms.append(p['name_local'])
+            TARGETS.append({
+                'name': p.get('name_local', name_en),
+                'name_en': name_en,
+                'slug': slug,
+                'search_terms': list(dict.fromkeys(terms))[:4],
+                'category': p.get('category', 'politician'),
+                'bio': p.get('bio', ''),
+                'keywords': [w.lower() for w in name_en.split()] + ([slug] if slug else []),
+            })
+        log.info(f'Loaded {len(TARGETS)} personalities from backend')
+    except Exception as e:
+        log.warning(f'Could not load personalities from API: {e}')
+        global _FALLBACK_TARGETS
+        TARGETS = _FALLBACK_TARGETS
+
+_FALLBACK_TARGETS = [
+    {'name': 'Balen Shah', 'name_en': 'Balen Shah', 'slug': 'balen-shah',
+     'search_terms': ['Balen Shah', 'Balendra Shah'], 'category': 'politician', 'bio': '', 'keywords': ['balen']},
+    {'name': 'Prachanda', 'name_en': 'Prachanda', 'slug': 'prachanda',
+     'search_terms': ['Prachanda', 'Pushpa Kamal Dahal'], 'category': 'politician', 'bio': '', 'keywords': ['prachanda']},
+    {'name': 'KP Oli', 'name_en': 'KP Oli', 'slug': 'kp-oli',
+     'search_terms': ['KP Oli', 'K.P. Oli', 'Khadga Prasad Oli'], 'category': 'politician', 'bio': '', 'keywords': ['kp', 'oli']},
+    {'name': 'Gagan Thapa', 'name_en': 'Gagan Thapa', 'slug': 'gagan-thapa',
+     'search_terms': ['Gagan Thapa'], 'category': 'politician', 'bio': '', 'keywords': ['gagan', 'thapa']},
+    {'name': 'Harka Sampang', 'name_en': 'Harka Sampang', 'slug': 'harka-sampang',
+     'search_terms': ['Harka Sampang', 'Harka Bahadur'], 'category': 'politician', 'bio': '', 'keywords': ['harka', 'sampang']},
 ]
 
-# ── RSS Feeds ───────────────────────────────────────────────────
+
 RSS_FEEDS = [
     ('onlinekhabar',     'https://www.onlinekhabar.com/feed'),
     ('ekantipur',        'https://ekantipur.com/rss'),
@@ -509,6 +514,9 @@ class ScraperV4:
         log.info(f'MAKEMYTHREAD SCRAPER v4.0 — Run {self.run_id}')
         log.info(f'API: {API_URL} | Push: {bool(API_SECRET)} | Force: {self.force_push}')
         log.info('=' * 70)
+
+        # Load personalities from backend (falls back to hardcoded list on failure)
+        load_targets()
 
         await self.preload_db_urls()
 
