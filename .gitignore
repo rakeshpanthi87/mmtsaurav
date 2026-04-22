@@ -1,0 +1,40 @@
+# Environment — NEVER commit real credentials
+.env
+.env.local
+.env.production
+
+# Database — contains real user data
+database/mmt.db
+database/mmt.db-shm
+database/mmt.db-wal
+database/backups/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Logs
+scraper_logs/
+*.log
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.python-version
+
+# Scraped data (can be regenerated)
+scraped_data/
+
+# Backups
+backups/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo

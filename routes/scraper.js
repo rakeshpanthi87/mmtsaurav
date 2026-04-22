@@ -1,0 +1,224 @@
+/**
+ * routes/scraper.js
+ * 
+ * Dedicated ingest endpoint for final_scraper_v3.py (and any future scraper version).
+ * Uses a separate SCRAPER_SECRET token — no admin login required from Python.
+ *
+ * POST /api/scraper/push
+ *   Body: { personalities: [...], news: [...] }
+ *   Header: x-scraper-secret: <SCRAPER_SECRET from .env>
+ */
+
+const router = require('express').Router();
+const { db, audit } = require('../database/db');
+
+// ── Auth middleware ──────────────────────────────────────────────
+function scraperAuth(req, res, next) {
+  const secret = req.headers['x-scraper-secret'];
+  const expected = process.env.SCRAPER_SECRET;
+  if (!expected) {
+    console.warn('[Scraper] SCRAPER_SECRET not set in .env — rejecting all scraper pushes');
+    return res.status(503).json({ error: 'Scraper ingest disabled — set SCRAPER_SECRET in .env' });
+  }
+  if (secret !== expected) {
+    return res.status(401).json({ error: 'Invalid scraper secret' });
+  }
+  next();
+}
+
+// ── Name → DB personality ID resolution ─────────────────────────
+function resolvePersonalityId(nameEn, nameNe) {
+  // Try English name first (case-insensitive slug match)
+  if (nameEn) {
+    const slug = nameEn.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    const bySlug = db.prepare('SELECT id FROM personalities WHERE slug = ?').get(slug);
+    if (bySlug) return bySlug.id;
+
+    // Try name match
+    const byName = db.prepare(
+      'SELECT id FROM personalities WHERE LOWER(name) = LOWER(?)'
+    ).get(nameEn);
+    if (byName) return byName.id;
+  }
+
+  // Try Nepali name
+  if (nameNe) {
+    const byLocal = db.prepare(
+      'SELECT id FROM personalities WHERE name_local = ?'
+    ).get(nameNe);
+    if (byLocal) return byLocal.id;
+  }
+
+  return null;
+}
+
+// ── Upsert personality (create if not exists) ────────────────────
+function upsertPersonality(p) {
+  const slug = p.name_en
+    ? p.name_en.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+    : p.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+
+  const existing = db.prepare('SELECT id FROM personalities WHERE slug = ?').get(slug);
+  if (existing) return existing.id;
+
+  // Auto-generate initials from English name
+  const initials = p.name_en
+    ? p.name_en.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+    : (p.name || '').slice(0, 2).toUpperCase();
+
+  const result = db.prepare(
+    `INSERT INTO personalities
+       (slug, name, name_local, category, nationality, bio, initials, avatar_bg, avatar_fg, verified)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`
+  ).run(
+    slug,
+    p.name_en || p.name,
+    p.name || null,
+    p.category || 'politician',
+    p.nationality || 'Nepali',
+    p.bio || null,
+    initials,
+    p.avatar_color || '#C9963A',
+    '#fff'
+  );
+
+  console.log(`[Scraper] Created personality: ${p.name_en || p.name} (id=${result.lastInsertRowid})`);
+  return result.lastInsertRowid;
+}
+
+// ── Main ingest endpoint ─────────────────────────────────────────
+router.post('/push', scraperAuth, (req, res) => {
+  const { personalities = [], news = [] } = req.body;
+
+  if (!Array.isArray(news)) {
+    return res.status(400).json({ error: 'news must be an array' });
+  }
+
+  const results = {
+    personalities_upserted: 0,
+    news_inserted: 0,
+    news_skipped_duplicate: 0,
+    news_skipped_no_personality: 0,
+    errors: []
+  };
+
+  // ── Step 1: Upsert personalities ─────────────────────────────
+  for (const p of personalities) {
+    try {
+      upsertPersonality(p);
+      results.personalities_upserted++;
+    } catch (e) {
+      results.errors.push(`Personality "${p.name_en}": ${e.message}`);
+    }
+  }
+
+  // ── Step 2: Insert news ──────────────────────────────────────
+  const insertStmt = db.prepare(
+    `INSERT OR IGNORE INTO news
+       (personality_id, title, snippet, full_content, source_name, source_url,
+        category, credibility, is_breaking, img_color, published_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  );
+
+  for (const article of news) {
+    try {
+      // Field mapping: scraper field → DB field
+      const title      = article.headline || article.title || '';
+      const snippet    = article.summary  || article.snippet || '';
+      const fullContent= article.full_content || snippet;
+      const sourceUrl  = article.link    || article.source_url || null;
+      const sourceName = article.source  || article.source_name || '';
+      const category   = article.category || 'general';
+      const publishedAt= article.published_at || article.published || null;
+
+      if (!title) { results.errors.push('Skipped article with empty title'); continue; }
+
+      // Resolve personality
+      // Scraper stores tags as JSON array of matched personality names
+      let personalityId = null;
+      if (article.personality_name_en || article.personality_name) {
+        personalityId = resolvePersonalityId(
+          article.personality_name_en,
+          article.personality_name
+        );
+      }
+
+      // Fallback: parse tags JSON for first name
+      if (!personalityId && article.tags) {
+        try {
+          const tags = typeof article.tags === 'string' ? JSON.parse(article.tags) : article.tags;
+          for (const tag of tags) {
+            personalityId = resolvePersonalityId(tag, tag);
+            if (personalityId) break;
+          }
+        } catch {}
+      }
+
+      if (!personalityId) {
+        results.news_skipped_no_personality++;
+        continue;
+      }
+
+      // Colors by category
+      const colorMap = {
+        politics: '#DBEAFE', sports: '#D1FAE5', business: '#FEF3C7',
+        technology: '#EDE9FE', social: '#FCE7F3', general: '#F3F4F6'
+      };
+
+      const r = insertStmt.run(
+        personalityId,
+        title,
+        snippet.slice(0, 500),
+        fullContent,
+        sourceName,
+        sourceUrl,
+        category,
+        85,  // default credibility for scraped articles
+        0,   // is_breaking = false by default
+        colorMap[category] || '#DBEAFE',
+        publishedAt
+      );
+
+      if (r.changes > 0) {
+        results.news_inserted++;
+      } else {
+        results.news_skipped_duplicate++;
+      }
+    } catch (e) {
+      results.errors.push(`Article "${(article.headline||'').slice(0, 40)}": ${e.message}`);
+    }
+  }
+
+  // Log to audit (system action, no admin_id)
+  try {
+    audit(null, 'scraper_push', 'news', null, {
+      inserted: results.news_inserted,
+      duplicates: results.news_skipped_duplicate,
+      skipped: results.news_skipped_no_personality
+    });
+  } catch {}
+
+  console.log(`[Scraper] Push complete — inserted: ${results.news_inserted}, dupes: ${results.news_skipped_duplicate}, no-match: ${results.news_skipped_no_personality}`);
+
+  res.json({
+    success: true,
+    ...results,
+    message: `Inserted ${results.news_inserted} articles. ${results.news_skipped_duplicate} duplicates skipped.`
+  });
+});
+
+// ── Status check ─────────────────────────────────────────────────
+router.get('/status', scraperAuth, (req, res) => {
+  const personalities = db.prepare('SELECT id, name, name_local, slug FROM personalities').all();
+  const newsCount = db.prepare('SELECT COUNT(*) as c FROM news').get().c;
+  res.json({
+    status: 'ok',
+    personalities: personalities.map(p => ({
+      id: p.id, slug: p.slug,
+      name: p.name, name_local: p.name_local
+    })),
+    total_news: newsCount
+  });
+});
+
+module.exports = router;

@@ -1,0 +1,1290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>MakeMyThread — Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet">
+<style>
+:root{
+  --cream:#FFF8E7;--cream2:#FFF3D4;--cream3:#FFEDC0;--white:#FFFFFF;
+  --ink:#1A1208;--ink2:#3D3020;--ink3:#6B5B3E;--ink4:#9C8B72;
+  --gold:#C9963A;--gold2:#E5B84A;--gold3:#F5D78A;--gold4:#FBF0D0;
+  --sage:#4A6741;--rust:#B54A2E;--rust2:#D96B4A;--sky:#2B5EA7;
+  --border:#E8D9B8;--border2:#D4C49A;
+  --shadow:rgba(26,18,8,0.08);--shadow2:rgba(26,18,8,0.14);
+  --r:12px;--font-display:'DM Serif Display',Georgia,serif;--font-body:'DM Sans',system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--cream);color:var(--ink);font-family:var(--font-body);font-size:14px;line-height:1.6;min-height:100vh;}
+h1,h2,h3,h4{font-family:var(--font-display);font-weight:400;}
+h1{font-size:2rem;}h2{font-size:1.5rem;}h3{font-size:1.1rem;}
+
+/* ── TOPBAR ── */
+.topbar{position:sticky;top:0;z-index:200;background:rgba(255,248,231,.96);backdrop-filter:blur(14px);border-bottom:1px solid var(--border);padding:0 24px;height:60px;display:flex;align-items:center;gap:16px;}
+.topbar-logo{font-family:var(--font-display);font-size:1.3rem;color:var(--ink);display:flex;align-items:center;gap:8px;text-decoration:none;}
+.topbar-logo .dot{width:8px;height:8px;border-radius:50%;background:var(--gold);}
+.tnav{display:flex;gap:2px;margin-left:24px;}
+.tnav a{padding:7px 14px;border-radius:20px;font-size:13px;font-weight:500;color:var(--ink3);text-decoration:none;transition:.15s;}
+.tnav a:hover{background:var(--cream2);color:var(--ink);}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px;}
+.badge-admin{background:var(--gold4);color:var(--gold);border:1px solid var(--gold3);padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;}
+.av{width:36px;height:36px;border-radius:50%;background:var(--ink);color:var(--cream);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;cursor:pointer;}
+
+/* ── LAYOUT ── */
+.page{max-width:1360px;margin:0 auto;padding:28px 24px 60px;}
+.page-header{display:flex;align-items:center;gap:14px;margin-bottom:28px;}
+.shield{width:48px;height:48px;border-radius:14px;background:var(--gold4);border:1px solid var(--gold3);display:flex;align-items:center;justify-content:center;font-size:22px;}
+.page-title{font-size:1.8rem;color:var(--ink);}
+.page-sub{font-size:13px;color:var(--ink3);}
+
+/* ── TABS ── */
+.tabs{display:flex;gap:2px;border-bottom:2px solid var(--border);margin-bottom:28px;overflow-x:auto;}
+.tab{padding:10px 18px;border:none;background:transparent;font-family:var(--font-body);font-size:13px;font-weight:500;color:var(--ink3);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap;transition:.15s;}
+.tab:hover{color:var(--ink);}
+.tab.active{color:var(--gold);border-bottom-color:var(--gold);}
+
+/* ── STAT CARDS ── */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-bottom:28px;}
+.stat-card{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:18px 20px;display:flex;align-items:center;gap:14px;}
+.stat-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.stat-num{font-family:var(--font-display);font-size:1.8rem;color:var(--ink);line-height:1;}
+.stat-label{font-size:11px;color:var(--ink4);margin-top:2px;}
+
+/* ── CARDS & TABLES ── */
+.card{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:20px;margin-bottom:20px;}
+.card-title{font-size:14px;font-weight:600;color:var(--ink);margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;}
+table{width:100%;border-collapse:collapse;}
+th{text-align:left;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink4);padding:10px 14px;border-bottom:1.5px solid var(--border);}
+td{padding:11px 14px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:var(--cream);}
+
+/* ── BUTTONS ── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:20px;border:1.5px solid transparent;font-family:var(--font-body);font-size:12px;font-weight:600;cursor:pointer;transition:.15s;white-space:nowrap;}
+.btn-gold{background:var(--gold);color:#fff;border-color:var(--gold);}
+.btn-gold:hover{background:#b5842e;}
+.btn-outline{background:transparent;color:var(--ink3);border-color:var(--border2);}
+.btn-outline:hover{background:var(--cream2);}
+.btn-danger{background:transparent;color:var(--rust);border-color:rgba(181,74,46,.3);}
+.btn-danger:hover{background:rgba(181,74,46,.08);}
+.btn-sm{padding:5px 12px;font-size:11px;}
+.btn-icon{width:30px;height:30px;padding:0;border-radius:50%;justify-content:center;background:transparent;border:1px solid var(--border);color:var(--ink3);cursor:pointer;display:inline-flex;align-items:center;transition:.15s;}
+.btn-icon:hover{border-color:var(--border2);background:var(--cream);}
+.btn-icon.danger:hover{color:var(--rust);border-color:rgba(181,74,46,.4);}
+.btn-icon.edit:hover{color:var(--sky);border-color:rgba(43,94,167,.4);}
+
+/* ── TOOLBAR ── */
+.toolbar{display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap;}
+.search-input{padding:8px 14px;border:1.5px solid var(--border);border-radius:20px;background:var(--white);font-family:var(--font-body);font-size:13px;color:var(--ink);outline:none;width:240px;transition:.2s;}
+.search-input:focus{border-color:var(--gold);}
+.filter-chip{padding:6px 14px;border-radius:20px;border:1.5px solid var(--border);background:var(--cream);color:var(--ink3);font-size:12px;font-weight:500;cursor:pointer;transition:.15s;font-family:var(--font-body);}
+.filter-chip.active{background:var(--ink);color:var(--cream);border-color:var(--ink);}
+.ml-auto{margin-left:auto;}
+
+/* ── ROLE BADGE ── */
+.role{display:inline-block;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600;}
+.role.admin{background:#FEF3C7;color:#92400E;}
+.role.user{background:#EFF6FF;color:#1E40AF;}
+.role.personality{background:#F0FDF4;color:#065F46;}
+
+/* ── VERDICT BADGE ── */
+.verdict{display:inline-block;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600;}
+.verdict.fake{background:#FEE2E2;color:#991B1B;}
+.verdict.misleading{background:#FEF3C7;color:#92400E;}
+.verdict.notsure{background:#F3F4F6;color:#374151;}
+
+/* ── ROLE SELECT ── */
+.role-select{padding:5px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font-body);font-size:12px;background:var(--cream);color:var(--ink);outline:none;cursor:pointer;}
+.role-select:focus{border-color:var(--gold);}
+
+/* ── BAR CHART ── */
+.bar-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.bar-label{font-size:12px;color:var(--ink3);width:120px;text-align:right;flex-shrink:0;}
+.bar-track{flex:1;height:8px;background:var(--cream3);border-radius:4px;overflow:hidden;}
+.bar-fill{height:100%;background:var(--gold);border-radius:4px;transition:width .6s ease;}
+.bar-count{font-size:12px;color:var(--ink4);min-width:28px;text-align:right;}
+
+/* ── MODAL ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(26,18,8,.5);backdrop-filter:blur(6px);z-index:800;display:none;align-items:center;justify-content:center;padding:20px;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--white);border-radius:16px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;box-shadow:0 16px 48px var(--shadow2);}
+.modal-header{padding:20px 24px 0;display:flex;align-items:center;justify-content:space-between;}
+.modal-title{font-family:var(--font-display);font-size:1.2rem;}
+.modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--ink4);padding:4px;}
+.modal-body{padding:20px 24px;}
+.modal-footer{padding:16px 24px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--border);}
+
+/* ── FORM ── */
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:12px;font-weight:600;color:var(--ink3);margin-bottom:5px;}
+.field input,.field select,.field textarea{width:100%;padding:9px 13px;border:1.5px solid var(--border);border-radius:9px;background:var(--cream);font-family:var(--font-body);font-size:13px;color:var(--ink);outline:none;transition:border-color .2s;}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--gold);background:var(--white);}
+.field textarea{resize:vertical;min-height:80px;}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.field-hint{font-size:11px;color:var(--ink4);margin-top:4px;}
+
+/* ── AVATAR ── */
+.av-sm{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;}
+
+/* ── TOGGLE ── */
+.toggle-wrap{display:flex;align-items:center;gap:12px;}
+.toggle{position:relative;width:44px;height:24px;flex-shrink:0;}
+.toggle input{opacity:0;width:0;height:0;}
+.toggle-slider{position:absolute;inset:0;background:var(--border2);border-radius:12px;cursor:pointer;transition:.2s;}
+.toggle-slider::after{content:'';position:absolute;width:18px;height:18px;border-radius:50%;background:#fff;top:3px;left:3px;transition:.2s;}
+.toggle input:checked + .toggle-slider{background:var(--gold);}
+.toggle input:checked + .toggle-slider::after{transform:translateX(20px);}
+.toggle-label{font-size:13px;color:var(--ink2);}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--cream);border-radius:20px;padding:10px 20px;font-size:13px;font-weight:500;z-index:9999;opacity:0;transition:.3s;pointer-events:none;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* ── KILL SWITCH ── */
+.kill-switch{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:20px;margin-bottom:20px;display:flex;align-items:center;gap:16px;}
+.ks-icon{width:44px;height:44px;border-radius:12px;background:var(--gold4);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+.ks-info{flex:1;}
+.ks-title{font-weight:600;font-size:14px;display:flex;align-items:center;gap:10px;}
+.status-pill{font-size:11px;font-weight:600;padding:2px 10px;border-radius:20px;}
+.status-pill.on{background:#D1FAE5;color:#065F46;}
+.status-pill.off{background:#FEE2E2;color:#991B1B;}
+.ks-desc{font-size:12px;color:var(--ink3);margin-top:3px;}
+
+/* ── SCOPE TABS ── */
+.scope-tabs{display:flex;gap:8px;margin-bottom:20px;}
+.scope-tab{padding:8px 18px;border-radius:20px;border:1.5px solid var(--border2);background:var(--cream);color:var(--ink3);font-size:13px;font-weight:500;cursor:pointer;transition:.15s;font-family:var(--font-body);}
+.scope-tab.active{background:var(--gold);color:#fff;border-color:var(--gold);}
+
+/* ── AI USAGE MINI CHART ── */
+.ai-chart{display:flex;align-items:flex-end;gap:4px;height:60px;margin-top:8px;}
+.ai-bar{flex:1;background:var(--gold3);border-radius:3px 3px 0 0;min-width:8px;transition:height .4s ease;}
+.ai-bar:hover{background:var(--gold);}
+
+/* ── SOURCE STATUS ── */
+.source-status{display:inline-block;width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.source-status.active{background:var(--sage);}
+.source-status.inactive{background:var(--ink4);}
+
+/* ── AUTH OVERLAY ── */
+.auth-overlay{position:fixed;inset:0;background:var(--cream);z-index:9999;display:flex;align-items:center;justify-content:center;}
+.auth-box{background:var(--white);border:1px solid var(--border);border-radius:16px;padding:36px;width:100%;max-width:380px;box-shadow:0 8px 32px var(--shadow);}
+.auth-logo{font-family:var(--font-display);font-size:1.6rem;text-align:center;margin-bottom:4px;}
+.auth-logo span{color:var(--gold);}
+.auth-sub{text-align:center;font-size:13px;color:var(--ink3);margin-bottom:28px;}
+.auth-error{background:#FEE2E2;color:#991B1B;padding:10px 14px;border-radius:8px;font-size:12px;margin-bottom:12px;display:none;}
+
+/* ── PAGINATION ── */
+.pagination{display:flex;align-items:center;gap:8px;justify-content:flex-end;margin-top:14px;}
+.page-btn{padding:6px 12px;border:1px solid var(--border);border-radius:8px;background:var(--white);font-size:12px;cursor:pointer;color:var(--ink3);}
+.page-btn:hover:not(:disabled){border-color:var(--gold);color:var(--gold);}
+.page-btn.active{background:var(--gold);color:#fff;border-color:var(--gold);}
+.page-btn:disabled{opacity:.4;cursor:not-allowed;}
+.page-info{font-size:12px;color:var(--ink4);}
+
+/* ── CHECKBOX ── */
+.cb{width:16px;height:16px;border:1.5px solid var(--border2);border-radius:4px;cursor:pointer;accent-color:var(--gold);}
+
+/* ── EMPTY ── */
+.empty{text-align:center;padding:40px;color:var(--ink4);font-size:13px;}
+
+/* ── SECTION LABEL ── */
+.section-label{font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--ink4);margin-bottom:12px;}
+
+/* ── AUDIT ROW ── */
+.audit-action{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;}
+.audit-action.create{background:#D1FAE5;color:#065F46;}
+.audit-action.delete{background:#FEE2E2;color:#991B1B;}
+.audit-action.update{background:#DBEAFE;color:#1E40AF;}
+.audit-action.role_change{background:#FEF3C7;color:#92400E;}
+.audit-action.toggle,.audit-action.block,.audit-action.unblock{background:#EDE9FE;color:#5B21B6;}
+.audit-action.fetch{background:#D1FAE5;color:#065F46;}
+.audit-action.bulk_delete{background:#FEE2E2;color:#991B1B;}
+
+/* ── TABS PANEL ── */
+.tab-panel{display:none;}
+.tab-panel.active{display:block;}
+</style>
+</head>
+<body>
+
+<!-- AUTH OVERLAY -->
+<div class="auth-overlay" id="authOverlay">
+  <div class="auth-box">
+    <div class="auth-logo">Make<span>My</span>Thread</div>
+    <div class="auth-sub">Admin access only</div>
+    <div class="auth-error" id="authError"></div>
+    <div class="field"><label>Email</label><input type="email" id="loginEmail" placeholder="admin@mmt.com" autocomplete="email"></div>
+    <div class="field"><label>Password</label><input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password"></div>
+    <button class="btn btn-gold" style="width:100%;justify-content:center;margin-top:4px;" onclick="doLogin()">Sign in</button>
+  </div>
+</div>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <a class="topbar-logo" href="/"><span class="dot"></span> MakeMyThread</a>
+  <nav class="tnav">
+    <a href="/">Discover</a>
+    <a href="/">My Feed</a>
+    <a href="/">Threads</a>
+    <a href="/">Fake Radar</a>
+  </nav>
+  <div class="topbar-right">
+    <span class="badge-admin">Admin</span>
+    <div class="av" id="adminAv">A</div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="page" id="adminPage" style="display:none;">
+  <div class="page-header">
+    <div class="shield">🛡️</div>
+    <div>
+      <div class="page-title">Admin Panel</div>
+      <div class="page-sub">Manage MakeMyThread platform</div>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('dashboard')">📊 Dashboard</button>
+    <button class="tab" onclick="switchTab('users')">👤 Users</button>
+    <button class="tab" onclick="switchTab('personalities')">🌟 Personalities</button>
+    <button class="tab" onclick="switchTab('news')">📰 News Posts</button>
+    <button class="tab" onclick="switchTab('fakenews')">⚠️ Fake News</button>
+    <button class="tab" onclick="switchTab('sources')">📡 Sources</button>
+    <button class="tab" onclick="switchTab('categories')">🏷️ Categories</button>
+    <button class="tab" onclick="switchTab('reactions')">⚡ Reactions</button>
+    <button class="tab" onclick="switchTab('auditlog')">📋 Audit Log</button>
+  </div>
+
+  <!-- DASHBOARD TAB -->
+  <div class="tab-panel active" id="panel-dashboard">
+    <div class="stat-grid" id="statGrid">
+      <div class="stat-card"><div class="stat-icon" style="background:#EFF6FF;">👥</div><div><div class="stat-num" id="s-users">—</div><div class="stat-label">Total Users</div></div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:#FBF0D0;">🌟</div><div><div class="stat-num" id="s-personalities">—</div><div class="stat-label">Personalities</div></div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:#F0FDF4;">📰</div><div><div class="stat-num" id="s-news">—</div><div class="stat-label">News Posts</div></div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:#FEF3C7;">❤️</div><div><div class="stat-num" id="s-reactions">—</div><div class="stat-label">Reactions</div></div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:#F5F3FF;">🧵</div><div><div class="stat-num" id="s-threads">—</div><div class="stat-label">Threads</div></div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:#FEE2E2;">🚨</div><div><div class="stat-num" id="s-fakeflags">—</div><div class="stat-label">Fake Flags</div></div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:20px;flex-wrap:wrap;">
+      <div class="card">
+        <div class="card-title">News by Category</div>
+        <div id="catChart"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">AI Usage — Last 7 days <span id="aiCallsBadge" style="font-size:11px;font-weight:400;color:var(--ink4);">0 calls</span></div>
+        <div class="ai-chart" id="aiChart"></div>
+        <div style="margin-top:14px;">
+          <div id="aiByEndpoint"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Recent News</div>
+      <table>
+        <thead><tr><th>Headline</th><th>Personality</th><th>Added</th></tr></thead>
+        <tbody id="recentNewsBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- USERS TAB -->
+  <div class="tab-panel" id="panel-users">
+    <div class="toolbar">
+      <input class="search-input" placeholder="Search users..." id="userSearch" oninput="debounce(loadUsers,400)()">
+      <button class="filter-chip active" onclick="filterUsers('',this)">All Roles</button>
+      <button class="filter-chip" onclick="filterUsers('admin',this)">Admin</button>
+      <button class="filter-chip" onclick="filterUsers('user',this)">User</button>
+      <button class="filter-chip" onclick="filterUsers('personality',this)">Personality</button>
+    </div>
+    <div class="card">
+      <table>
+        <thead><tr><th>User</th><th>Role</th><th>Joined</th><th>Actions</th></tr></thead>
+        <tbody id="usersBody"></tbody>
+      </table>
+      <div id="usersPagination"></div>
+    </div>
+  </div>
+
+  <!-- PERSONALITIES TAB -->
+  <div class="tab-panel" id="panel-personalities">
+    <div class="toolbar">
+      <span id="pCount" style="font-size:13px;color:var(--ink3);"></span>
+      <button class="btn btn-gold ml-auto" onclick="openModal('personality')">+ Add Personality</button>
+    </div>
+    <div class="card">
+      <table>
+        <thead><tr><th>Name</th><th>Category</th><th>Nationality</th><th>Followers</th><th>Actions</th></tr></thead>
+        <tbody id="personalitiesBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- NEWS POSTS TAB -->
+  <div class="tab-panel" id="panel-news">
+    <div class="toolbar">
+      <input class="search-input" placeholder="Search headlines..." id="newsSearch" oninput="debounce(loadNews,400)()">
+      <select class="role-select" id="newsCatFilter" onchange="loadNews()" style="border-radius:20px;padding:7px 12px;">
+        <option value="">All Categories</option>
+      </select>
+      <span id="newsCount" style="font-size:13px;color:var(--ink3);"></span>
+      <button class="btn btn-danger btn-sm ml-auto" id="bulkDeleteBtn" style="display:none;" onclick="bulkDeleteNews()">Delete Selected</button>
+      <button class="btn btn-gold" onclick="openModal('news')">+ Add News Post</button>
+    </div>
+    <div class="card">
+      <table>
+        <thead><tr><th><input type="checkbox" class="cb" id="selectAll" onchange="toggleSelectAll(this)"></th><th>Headline</th><th>Personality</th><th>Category</th><th>Actions</th></tr></thead>
+        <tbody id="newsBody"></tbody>
+      </table>
+      <div id="newsPagination"></div>
+    </div>
+  </div>
+
+  <!-- FAKE NEWS TAB -->
+  <div class="tab-panel" id="panel-fakenews">
+    <div class="toolbar">
+      <span id="fnCount" style="font-size:13px;color:var(--ink3);"></span>
+      <button class="btn btn-gold ml-auto" onclick="openModal('fakenews')">+ Add Fake News Entry</button>
+    </div>
+    <div class="card">
+      <table>
+        <thead><tr><th>Headline</th><th>Personality</th><th>Verdict</th><th>Severity</th><th>Actions</th></tr></thead>
+        <tbody id="fakeNewsBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- SOURCES TAB -->
+  <div class="tab-panel" id="panel-sources">
+    <div class="toolbar">
+      <span id="srcCount" style="font-size:13px;color:var(--ink3);"></span>
+      <button class="btn btn-gold ml-auto" onclick="openModal('source')">+ Add Source</button>
+    </div>
+    <div class="card">
+      <table>
+        <thead><tr><th>Status</th><th>Label / URL</th><th>Personality</th><th>Type</th><th>Interval</th><th>Last Fetched</th><th>Actions</th></tr></thead>
+        <tbody id="sourcesBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- CATEGORIES TAB -->
+  <div class="tab-panel" id="panel-categories">
+    <div class="toolbar">
+      <button class="btn btn-gold ml-auto" onclick="openModal('category')">+ Add Category</button>
+    </div>
+    <div class="card">
+      <table>
+        <thead><tr><th>Color</th><th>Name</th><th>Actions</th></tr></thead>
+        <tbody id="categoriesBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- REACTIONS TAB -->
+  <div class="tab-panel" id="panel-reactions">
+    <div class="kill-switch" id="killSwitchCard">
+      <div class="ks-icon">⚡</div>
+      <div class="ks-info">
+        <div class="ks-title">Master Reactions Kill Switch <span class="status-pill on" id="killStatus">ALL REACTIONS ON</span></div>
+        <div class="ks-desc">Toggle OFF to instantly disable every reaction button on every news card for every user.</div>
+      </div>
+      <label class="toggle"><input type="checkbox" id="killToggle" checked onchange="toggleKillSwitch(this.checked)"><span class="toggle-slider"></span></label>
+    </div>
+    <div class="section-label">Control Scope</div>
+    <div class="scope-tabs">
+      <button class="scope-tab active" onclick="setScope('platform',this)">🌐 Entire Platform</button>
+      <button class="scope-tab" onclick="setScope('personality',this)">🌟 By Personality</button>
+      <button class="scope-tab" onclick="setScope('user',this)">👤 By User Account</button>
+    </div>
+    <div id="scopePanel-platform">
+      <div class="card"><p style="font-size:13px;color:var(--ink3);">Platform-wide reactions are controlled by the kill switch above. All users are affected.</p></div>
+    </div>
+    <div id="scopePanel-personality" style="display:none;">
+      <div class="card">
+        <div class="section-label">Select Personality</div>
+        <select class="role-select" id="rcPersonalitySelect" style="width:100%;border-radius:9px;padding:9px 12px;margin-bottom:16px;" onchange="loadPersonalityRC()">
+          <option value="">— Choose a personality —</option>
+        </select>
+        <div id="personalityRCPanel"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Personality Reaction Overrides</div>
+        <table><thead><tr><th>Personality</th><th>Reactions</th><th>Blocked Types</th><th>Actions</th></tr></thead>
+        <tbody id="personalityRCList"></tbody></table>
+      </div>
+    </div>
+    <div id="scopePanel-user" style="display:none;">
+      <div class="card">
+        <div class="section-label">Search User Account</div>
+        <input class="search-input" style="width:100%;border-radius:9px;" placeholder="Search by name or email..." id="rcUserSearch" oninput="debounce(searchRCUser,400)()">
+        <div id="rcUserResults" style="margin-top:12px;"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Currently Blocked Users (<span id="blockedCount">0</span>)</div>
+        <table><thead><tr><th>User</th><th>Email</th><th>Actions</th></tr></thead>
+        <tbody id="blockedUsersBody"></tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <!-- AUDIT LOG TAB -->
+  <div class="tab-panel" id="panel-auditlog">
+    <div class="toolbar">
+      <select class="role-select" id="auditEntityFilter" onchange="loadAuditLog()" style="border-radius:20px;padding:7px 12px;">
+        <option value="">All Entities</option>
+        <option value="user">User</option>
+        <option value="personality">Personality</option>
+        <option value="news">News</option>
+        <option value="fake_news">Fake News</option>
+        <option value="source">Source</option>
+        <option value="category">Category</option>
+        <option value="reaction_control">Reaction Control</option>
+      </select>
+      <select class="role-select" id="auditActionFilter" onchange="loadAuditLog()" style="border-radius:20px;padding:7px 12px;">
+        <option value="">All Actions</option>
+        <option value="create">Create</option>
+        <option value="update">Update</option>
+        <option value="delete">Delete</option>
+        <option value="role_change">Role Change</option>
+        <option value="toggle">Toggle</option>
+        <option value="fetch">Fetch</option>
+        <option value="bulk_delete">Bulk Delete</option>
+      </select>
+      <span id="auditCount" style="font-size:13px;color:var(--ink4);margin-left:4px;"></span>
+    </div>
+    <div class="card">
+      <table>
+        <thead><tr><th>Time</th><th>Admin</th><th>Action</th><th>Entity</th><th>Detail</th></tr></thead>
+        <tbody id="auditBody"></tbody>
+      </table>
+      <div id="auditPagination"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODALS -->
+<!-- Personality Modal -->
+<div class="modal-overlay" id="modal-personality">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="pModalTitle">Add Personality</div>
+      <button class="modal-close" onclick="closeModal('personality')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="pEditId">
+      <div class="field-row">
+        <div class="field"><label>Name *</label><input id="pName" placeholder="Balen Shah"></div>
+        <div class="field"><label>Local Name</label><input id="pNameLocal" placeholder="बालेन शाह"></div>
+      </div>
+      <div class="field"><label>Slug * <span class="field-hint">URL-safe, no spaces</span></label><input id="pSlug" placeholder="balen-shah"></div>
+      <div class="field-row">
+        <div class="field"><label>Category</label><select id="pCategory"></select></div>
+        <div class="field"><label>Nationality</label><input id="pNationality" placeholder="Nepali"></div>
+      </div>
+      <div class="field"><label>Bio</label><textarea id="pBio" placeholder="Short biography..."></textarea></div>
+      <div class="field"><label>Background Info</label><textarea id="pBgInfo" placeholder="Context for AI analysis..."></textarea></div>
+      <div class="field-row">
+        <div class="field"><label>Avatar BG Color</label><input type="color" id="pAvatarBg" value="#C9963A"></div>
+        <div class="field"><label>Avatar Text Color</label><input type="color" id="pAvatarFg" value="#ffffff"></div>
+      </div>
+      <div class="field"><label>Initials</label><input id="pInitials" placeholder="BS" maxlength="3"></div>
+      <div class="field"><label class="toggle-wrap"><span class="toggle-label">Verified</span><label class="toggle"><input type="checkbox" id="pVerified"><span class="toggle-slider"></span></label></label></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('personality')">Cancel</button>
+      <button class="btn btn-gold" onclick="savePersonality()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- News Modal -->
+<div class="modal-overlay" id="modal-news">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="nModalTitle">Add News Post</div>
+      <button class="modal-close" onclick="closeModal('news')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="nEditId">
+      <div class="field"><label>Headline *</label><input id="nTitle" placeholder="News headline..."></div>
+      <div class="field"><label>Snippet</label><textarea id="nSnippet" placeholder="Short summary of the news article..."></textarea></div>
+      <div class="field-row">
+        <div class="field"><label>Personality</label><select id="nPersonality"><option value="">— None —</option></select></div>
+        <div class="field"><label>Category</label><select id="nCategory"></select></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Source Name</label><input id="nSourceName" placeholder="The Kathmandu Post"></div>
+        <div class="field"><label>Source URL</label><input id="nSourceUrl" placeholder="https://..."></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Credibility (0–100)</label><input type="number" id="nCredibility" value="80" min="0" max="100"></div>
+        <div class="field"><label>Bias</label>
+          <select id="nBias"><option value="neutral">Neutral</option><option value="left">Left</option><option value="right">Right</option><option value="pro-govt">Pro-Govt</option><option value="anti-govt">Anti-Govt</option></select>
+        </div>
+      </div>
+      <div class="field"><label class="toggle-wrap"><span class="toggle-label">Breaking News</span><label class="toggle"><input type="checkbox" id="nBreaking"><span class="toggle-slider"></span></label></label></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('news')">Cancel</button>
+      <button class="btn btn-gold" onclick="saveNews()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Fake News Modal -->
+<div class="modal-overlay" id="modal-fakenews">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="fnModalTitle">Add Fake News Entry</div>
+      <button class="modal-close" onclick="closeModal('fakenews')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="fnEditId">
+      <div class="field"><label>Fake Headline *</label><input id="fnHeadline" placeholder="The false headline being circulated..."></div>
+      <div class="field"><label>Claim</label><textarea id="fnClaim" placeholder="What the fake story claims..."></textarea></div>
+      <div class="field"><label>Debunk</label><textarea id="fnDebunk" placeholder="The actual facts that disprove this..."></textarea></div>
+      <div class="field"><label>Personality</label><select id="fnPersonality"><option value="">— None —</option></select></div>
+      <div class="field-row">
+        <div class="field"><label>Verdict</label>
+          <select id="fnVerdict"><option value="fake">Fake</option><option value="misleading">Misleading</option><option value="notsure">Not Sure</option></select>
+        </div>
+        <div class="field"><label>Severity</label>
+          <select id="fnSeverity"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select>
+        </div>
+      </div>
+      <div class="field"><label>Source URLs (one per line)</label><textarea id="fnSources" placeholder="https://factcheck.org/...&#10;https://bbc.com/..."></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('fakenews')">Cancel</button>
+      <button class="btn btn-gold" onclick="saveFakeNews()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Source Modal -->
+<div class="modal-overlay" id="modal-source">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="srcModalTitle">Add News Source</div>
+      <button class="modal-close" onclick="closeModal('source')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="srcEditId">
+      <div class="field"><label>RSS Feed URL *</label><input id="srcUrl" placeholder="https://example.com/rss.xml"></div>
+      <div class="field"><label>Label</label><input id="srcLabel" placeholder="Kathmandu Post — Balen Shah"></div>
+      <div class="field"><label>Personality</label><select id="srcPersonality"><option value="">— None —</option></select></div>
+      <div class="field-row">
+        <div class="field"><label>Type</label>
+          <select id="srcType"><option value="rss">RSS</option><option value="newsapi">NewsAPI</option><option value="manual">Manual</option></select>
+        </div>
+        <div class="field"><label>Fetch Interval (minutes)</label><input type="number" id="srcInterval" value="60" min="15"></div>
+      </div>
+      <div class="field"><label class="toggle-wrap"><span class="toggle-label">Active</span><label class="toggle"><input type="checkbox" id="srcActive" checked><span class="toggle-slider"></span></label></label></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('source')">Cancel</button>
+      <button class="btn btn-gold" onclick="saveSource()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Category Modal -->
+<div class="modal-overlay" id="modal-category">
+  <div class="modal" style="max-width:380px;">
+    <div class="modal-header">
+      <div class="modal-title">Add Category</div>
+      <button class="modal-close" onclick="closeModal('category')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field"><label>Name *</label><input id="catName" placeholder="technology"></div>
+      <div class="field"><label>Color</label><input type="color" id="catColor" value="#C9963A"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('category')">Cancel</button>
+      <button class="btn btn-gold" onclick="saveCategory()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── STATE ──────────────────────────────────────────────────────────
+let TOKEN = localStorage.getItem('mmt_admin_token');
+let ME = null;
+let personalities = [];
+let categories = [];
+let currentTab = 'dashboard';
+let newsPage = 1;
+let usersPage = 1;
+let auditPage = 1;
+let userRoleFilter = '';
+let selectedNewsIds = new Set();
+
+// ── AUTH ──────────────────────────────────────────────────────────
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('authError');
+  errEl.style.display = 'none';
+  try {
+    const r = await api('/api/auth/login', 'POST', { email, password }, false);
+    if (r.error) { errEl.textContent = r.error; errEl.style.display = 'block'; return; }
+    if (r.user?.role !== 'admin') { errEl.textContent = 'Admin access required'; errEl.style.display = 'block'; return; }
+    TOKEN = r.token;
+    localStorage.setItem('mmt_admin_token', TOKEN);
+    ME = r.user;
+    initApp();
+  } catch { errEl.textContent = 'Connection error'; errEl.style.display = 'block'; }
+}
+document.getElementById('loginPassword').addEventListener('keydown', e => { if (e.key==='Enter') doLogin(); });
+
+async function initApp() {
+  if (!TOKEN) { document.getElementById('authOverlay').style.display = 'flex'; return; }
+  try {
+    const r = await api('/api/auth/me');
+    if (r.error || r.user?.role !== 'admin') { logout(); return; }
+    ME = r.user;
+    document.getElementById('adminAv').textContent = ME.initials || 'A';
+    document.getElementById('authOverlay').style.display = 'none';
+    document.getElementById('adminPage').style.display = 'block';
+    await loadGlobals();
+    loadTab('dashboard');
+  } catch { logout(); }
+}
+
+function logout() {
+  localStorage.removeItem('mmt_admin_token');
+  TOKEN = null;
+  document.getElementById('authOverlay').style.display = 'flex';
+  document.getElementById('adminPage').style.display = 'none';
+}
+
+// ── API HELPER ────────────────────────────────────────────────────
+async function api(url, method='GET', body=null, auth=true) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (auth && TOKEN) opts.headers['Authorization'] = `Bearer ${TOKEN}`;
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(url, opts);
+  return r.json();
+}
+
+// ── GLOBALS (personalities + categories) ──────────────────────────
+async function loadGlobals() {
+  [personalities, categories] = await Promise.all([
+    api('/api/admin/personalities').then(d => Array.isArray(d) ? d : []),
+    api('/api/admin/categories').then(d => Array.isArray(d) ? d : [])
+  ]);
+  populateCategorySelects();
+  populatePersonalitySelects();
+}
+
+function populateCategorySelects() {
+  const opts = categories.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+  ['pCategory','nCategory'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.innerHTML = `<option value="">— None —</option>${opts}`; }
+  });
+  const newsFilter = document.getElementById('newsCatFilter');
+  if (newsFilter) newsFilter.innerHTML = `<option value="">All Categories</option>${opts}`;
+}
+
+function populatePersonalitySelects() {
+  const opts = personalities.map(p => `<option value="${p.id}">${p.name_local||p.name}</option>`).join('');
+  ['nPersonality','fnPersonality','srcPersonality','rcPersonalitySelect'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.innerHTML = `<option value="">— None —</option>${opts}`; }
+  });
+}
+
+// ── TABS ──────────────────────────────────────────────────────────
+function switchTab(name) {
+  currentTab = name;
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', t.getAttribute('onclick').includes(`'${name}'`)));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `panel-${name}`));
+  loadTab(name);
+}
+
+function loadTab(name) {
+  const loaders = {
+    dashboard: loadDashboard,
+    users: loadUsers,
+    personalities: loadPersonalities,
+    news: loadNews,
+    fakenews: loadFakeNews,
+    sources: loadSources,
+    categories: loadCategories,
+    reactions: loadReactions,
+    auditlog: loadAuditLog
+  };
+  if (loaders[name]) loaders[name]();
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────────────
+async function loadDashboard() {
+  const d = await api('/api/admin/stats');
+  document.getElementById('s-users').textContent = d.users ?? '—';
+  document.getElementById('s-personalities').textContent = d.personalities ?? '—';
+  document.getElementById('s-news').textContent = d.news ?? '—';
+  document.getElementById('s-reactions').textContent = d.reactions ?? '—';
+  document.getElementById('s-threads').textContent = d.threads ?? '—';
+  document.getElementById('s-fakeflags').textContent = d.fake_flags ?? '—';
+
+  // Category chart
+  const cats = d.news_by_category || [];
+  const max = cats[0]?.count || 1;
+  document.getElementById('catChart').innerHTML = cats.map(c =>
+    `<div class="bar-row">
+      <div class="bar-label">${esc(c.category||'none')}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${(c.count/max*100).toFixed(1)}%"></div></div>
+      <div class="bar-count">${c.count}</div>
+    </div>`
+  ).join('') || '<div class="empty">No data yet</div>';
+
+  // AI chart
+  const ai = d.ai_usage || [];
+  const maxAI = Math.max(...ai.map(x=>x.calls), 1);
+  document.getElementById('aiChart').innerHTML = ai.length
+    ? ai.map(x => `<div class="ai-bar" title="${x.day}: ${x.calls} calls" style="height:${Math.max(8,(x.calls/maxAI*56)).toFixed(0)}px;"></div>`).join('')
+    : '<div style="font-size:12px;color:var(--ink4);">No AI usage yet</div>';
+  document.getElementById('aiCallsBadge').textContent = `${d.ai_total_calls||0} calls (${d.ai_cached_calls||0} cached)`;
+
+  // Recent news
+  const rn = d.recent_news || [];
+  document.getElementById('recentNewsBody').innerHTML = rn.map(n =>
+    `<tr><td>${esc(n.title)}</td><td>${esc(n.personality||'—')}</td><td>${fmtDate(n.created_at)}</td></tr>`
+  ).join('') || '<tr><td colspan="3" class="empty">No news yet</td></tr>';
+}
+
+// ── USERS ─────────────────────────────────────────────────────────
+async function loadUsers() {
+  const q = document.getElementById('userSearch')?.value || '';
+  const r = await api(`/api/admin/users?q=${encodeURIComponent(q)}&role=${userRoleFilter}`);
+  const rows = Array.isArray(r) ? r : [];
+  document.getElementById('usersBody').innerHTML = rows.length
+    ? rows.map(u => `
+      <tr>
+        <td><div style="display:flex;align-items:center;gap:10px;">
+          <div class="av-sm" style="background:${u.avatar_bg||'#1A1208'};color:${u.avatar_fg||'#fff'}">${u.initials||'?'}</div>
+          <div><div style="font-weight:500;">${esc(u.name)}</div><div style="font-size:11px;color:var(--ink4);">${esc(u.email)}</div></div>
+        </div></td>
+        <td>
+          <select class="role-select" onchange="changeUserRole(${u.id},this.value)">
+            <option value="user" ${u.role==='user'?'selected':''}>user</option>
+            <option value="admin" ${u.role==='admin'?'selected':''}>admin</option>
+            <option value="personality" ${u.role==='personality'?'selected':''}>personality</option>
+          </select>
+        </td>
+        <td>${fmtDate(u.created_at)}</td>
+        <td><button class="btn-icon danger" onclick="deleteUser(${u.id},'${esc(u.name)}')" title="Delete">🗑</button></td>
+      </tr>`).join('')
+    : '<tr><td colspan="4" class="empty">No users found</td></tr>';
+}
+
+function filterUsers(role, el) {
+  userRoleFilter = role;
+  document.querySelectorAll('#panel-users .filter-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  loadUsers();
+}
+
+async function changeUserRole(id, role) {
+  const r = await api(`/api/admin/users/${id}/role`, 'PUT', { role });
+  if (r.error) toast(r.error, true); else { toast('Role updated'); loadUsers(); }
+}
+
+async function deleteUser(id, name) {
+  if (!confirm(`Delete user "${name}"? This cannot be undone.`)) return;
+  const r = await api(`/api/admin/users/${id}`, 'DELETE');
+  if (r.error) toast(r.error, true); else { toast('User deleted'); loadUsers(); }
+}
+
+// ── PERSONALITIES ─────────────────────────────────────────────────
+async function loadPersonalities() {
+  const rows = await api('/api/admin/personalities');
+  document.getElementById('pCount').textContent = `${Array.isArray(rows)?rows.length:0} personalities`;
+  document.getElementById('personalitiesBody').innerHTML = (Array.isArray(rows)?rows:[]).map(p => `
+    <tr>
+      <td><div style="display:flex;align-items:center;gap:10px;">
+        <div class="av-sm" style="background:${p.avatar_bg};color:${p.avatar_fg}">${p.initials||'?'}</div>
+        <div><div style="font-weight:500;">${esc(p.name_local||p.name)}</div>${p.name_local?`<div style="font-size:11px;color:var(--ink4);">${esc(p.name)}</div>`:''}</div>
+      </div></td>
+      <td>${p.category?`<span style="background:var(--gold4);color:var(--gold);padding:2px 10px;border-radius:20px;font-size:11px;">${esc(p.category)}</span>`:'—'}</td>
+      <td>${esc(p.nationality||'—')}</td>
+      <td>${p.followers||0}</td>
+      <td style="display:flex;gap:6px;">
+        <button class="btn-icon edit" onclick="editPersonality(${p.id})" title="Edit">✏️</button>
+        <button class="btn-icon danger" onclick="deletePersonality(${p.id},'${esc(p.name)}')" title="Delete">🗑</button>
+      </td>
+    </tr>`).join('') || '<tr><td colspan="5" class="empty">No personalities yet</td></tr>';
+}
+
+function openModal(type) {
+  document.getElementById(`modal-${type}`).classList.add('open');
+}
+function closeModal(type) {
+  document.getElementById(`modal-${type}`).classList.remove('open');
+}
+
+function editPersonality(id) {
+  const p = personalities.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('pModalTitle').textContent = 'Edit Personality';
+  document.getElementById('pEditId').value = p.id;
+  document.getElementById('pName').value = p.name;
+  document.getElementById('pNameLocal').value = p.name_local||'';
+  document.getElementById('pSlug').value = p.slug;
+  document.getElementById('pCategory').value = p.category||'';
+  document.getElementById('pNationality').value = p.nationality||'';
+  document.getElementById('pBio').value = p.bio||'';
+  document.getElementById('pBgInfo').value = p.bg_info||'';
+  document.getElementById('pAvatarBg').value = p.avatar_bg||'#C9963A';
+  document.getElementById('pAvatarFg').value = p.avatar_fg||'#ffffff';
+  document.getElementById('pInitials').value = p.initials||'';
+  document.getElementById('pVerified').checked = !!p.verified;
+  openModal('personality');
+}
+
+async function savePersonality() {
+  const id = document.getElementById('pEditId').value;
+  const payload = {
+    name: document.getElementById('pName').value,
+    name_local: document.getElementById('pNameLocal').value||null,
+    slug: document.getElementById('pSlug').value,
+    category: document.getElementById('pCategory').value||null,
+    nationality: document.getElementById('pNationality').value||null,
+    bio: document.getElementById('pBio').value||null,
+    bg_info: document.getElementById('pBgInfo').value||null,
+    avatar_bg: document.getElementById('pAvatarBg').value,
+    avatar_fg: document.getElementById('pAvatarFg').value,
+    initials: document.getElementById('pInitials').value||null,
+    verified: document.getElementById('pVerified').checked?1:0
+  };
+  const url = id ? `/api/admin/personalities/${id}` : '/api/admin/personalities';
+  const method = id ? 'PUT' : 'POST';
+  const r = await api(url, method, payload);
+  if (r.error) { toast(r.error, true); return; }
+  toast(id ? 'Personality updated' : 'Personality added');
+  closeModal('personality');
+  document.getElementById('pEditId').value = '';
+  document.getElementById('pModalTitle').textContent = 'Add Personality';
+  await loadGlobals();
+  loadPersonalities();
+}
+
+async function deletePersonality(id, name) {
+  if (!confirm(`Delete "${name}"? This will also delete all associated news.`)) return;
+  const r = await api(`/api/admin/personalities/${id}`, 'DELETE');
+  if (r.error) toast(r.error, true); else { toast('Personality deleted'); await loadGlobals(); loadPersonalities(); }
+}
+
+// ── NEWS ──────────────────────────────────────────────────────────
+async function loadNews() {
+  selectedNewsIds.clear();
+  document.getElementById('bulkDeleteBtn').style.display = 'none';
+  const q = document.getElementById('newsSearch')?.value||'';
+  const cat = document.getElementById('newsCatFilter')?.value||'';
+  const r = await api(`/api/admin/news?q=${encodeURIComponent(q)}&category=${cat}&page=${newsPage}&limit=30`);
+  const rows = r.data || [];
+  document.getElementById('newsCount').textContent = `${r.total||0} posts`;
+  document.getElementById('newsBody').innerHTML = rows.map(n => `
+    <tr>
+      <td><input type="checkbox" class="cb news-cb" value="${n.id}" onchange="toggleNewsSelect(${n.id},this.checked)"></td>
+      <td><div style="font-weight:500;max-width:480px;">${esc(n.title)}</div><div style="font-size:11px;color:var(--ink4);">${esc(n.source_name||'')}</div></td>
+      <td>${esc(n.personality_name_local||n.personality_name||'—')}</td>
+      <td>${n.category?`<span style="background:var(--gold4);color:var(--gold);padding:2px 8px;border-radius:20px;font-size:10px;">${esc(n.category)}</span>`:'—'}</td>
+      <td style="display:flex;gap:6px;">
+        <button class="btn-icon edit" onclick="editNews(${n.id})" title="Edit">✏️</button>
+        <button class="btn-icon danger" onclick="deleteNews(${n.id})" title="Delete">🗑</button>
+      </td>
+    </tr>`).join('') || '<tr><td colspan="5" class="empty">No news yet</td></tr>';
+  renderPagination('newsPagination', newsPage, Math.ceil((r.total||0)/30), p => { newsPage=p; loadNews(); });
+}
+
+function toggleSelectAll(cb) {
+  document.querySelectorAll('.news-cb').forEach(c => { c.checked = cb.checked; toggleNewsSelect(parseInt(c.value), cb.checked); });
+}
+
+function toggleNewsSelect(id, checked) {
+  if (checked) selectedNewsIds.add(id); else selectedNewsIds.delete(id);
+  document.getElementById('bulkDeleteBtn').style.display = selectedNewsIds.size ? 'inline-flex' : 'none';
+}
+
+async function bulkDeleteNews() {
+  if (!selectedNewsIds.size || !confirm(`Delete ${selectedNewsIds.size} articles?`)) return;
+  const r = await api('/api/admin/news/bulk-delete', 'POST', { ids: [...selectedNewsIds] });
+  if (r.error) toast(r.error, true); else { toast(`${r.deleted} articles deleted`); loadNews(); }
+}
+
+function editNews(id) {
+  api(`/api/admin/news?q=&page=1&limit=200`).then(r => {
+    const n = (r.data||[]).find(x => x.id === id);
+    if (!n) return;
+    document.getElementById('nModalTitle').textContent = 'Edit News Post';
+    document.getElementById('nEditId').value = n.id;
+    document.getElementById('nTitle').value = n.title;
+    document.getElementById('nSnippet').value = n.snippet||'';
+    document.getElementById('nPersonality').value = n.personality_id||'';
+    document.getElementById('nCategory').value = n.category||'';
+    document.getElementById('nSourceName').value = n.source_name||'';
+    document.getElementById('nSourceUrl').value = n.source_url||'';
+    document.getElementById('nCredibility').value = n.credibility||80;
+    document.getElementById('nBias').value = n.bias||'neutral';
+    document.getElementById('nBreaking').checked = !!n.is_breaking;
+    openModal('news');
+  });
+}
+
+async function saveNews() {
+  const id = document.getElementById('nEditId').value;
+  const payload = {
+    title: document.getElementById('nTitle').value,
+    snippet: document.getElementById('nSnippet').value||null,
+    personality_id: document.getElementById('nPersonality').value||null,
+    category: document.getElementById('nCategory').value||null,
+    source_name: document.getElementById('nSourceName').value||null,
+    source_url: document.getElementById('nSourceUrl').value||null,
+    credibility: parseInt(document.getElementById('nCredibility').value)||80,
+    bias: document.getElementById('nBias').value,
+    is_breaking: document.getElementById('nBreaking').checked?1:0
+  };
+  const r = await api(id ? `/api/admin/news/${id}` : '/api/admin/news', id?'PUT':'POST', payload);
+  if (r.error) { toast(r.error, true); return; }
+  toast(id ? 'News updated' : 'News added');
+  closeModal('news');
+  document.getElementById('nEditId').value = '';
+  document.getElementById('nModalTitle').textContent = 'Add News Post';
+  loadNews();
+}
+
+async function deleteNews(id) {
+  if (!confirm('Delete this news post?')) return;
+  const r = await api(`/api/admin/news/${id}`, 'DELETE');
+  if (r.error) toast(r.error, true); else { toast('Deleted'); loadNews(); }
+}
+
+// ── FAKE NEWS ─────────────────────────────────────────────────────
+async function loadFakeNews() {
+  const rows = await api('/api/admin/fake-news');
+  document.getElementById('fnCount').textContent = `${Array.isArray(rows)?rows.length:0} entries`;
+  document.getElementById('fakeNewsBody').innerHTML = (Array.isArray(rows)?rows:[]).map(fn => `
+    <tr>
+      <td style="max-width:400px;font-weight:500;">${esc(fn.headline)}</td>
+      <td>${esc(fn.personality_name_local||fn.personality_name||'—')}</td>
+      <td><span class="verdict ${fn.verdict}">${fn.verdict}</span></td>
+      <td><span style="font-size:11px;color:var(--ink3);">${fn.severity||'—'}</span></td>
+      <td style="display:flex;gap:6px;">
+        <button class="btn-icon edit" onclick="editFakeNews(${fn.id})" title="Edit">✏️</button>
+        <button class="btn-icon danger" onclick="deleteFakeNews(${fn.id})" title="Delete">🗑</button>
+      </td>
+    </tr>`).join('') || '<tr><td colspan="5" class="empty">No fake news entries yet</td></tr>';
+}
+
+function editFakeNews(id) {
+  api('/api/admin/fake-news').then(rows => {
+    const fn = (rows||[]).find(x => x.id === id);
+    if (!fn) return;
+    document.getElementById('fnModalTitle').textContent = 'Edit Fake News Entry';
+    document.getElementById('fnEditId').value = fn.id;
+    document.getElementById('fnHeadline').value = fn.headline;
+    document.getElementById('fnClaim').value = fn.claim||'';
+    document.getElementById('fnDebunk').value = fn.debunk||'';
+    document.getElementById('fnPersonality').value = fn.personality_id||'';
+    document.getElementById('fnVerdict').value = fn.verdict||'fake';
+    document.getElementById('fnSeverity').value = fn.severity||'medium';
+    try { document.getElementById('fnSources').value = (JSON.parse(fn.sources)||[]).join('\n'); } catch {}
+    openModal('fakenews');
+  });
+}
+
+async function saveFakeNews() {
+  const id = document.getElementById('fnEditId').value;
+  const sources = document.getElementById('fnSources').value.split('\n').map(s=>s.trim()).filter(Boolean);
+  const payload = {
+    headline: document.getElementById('fnHeadline').value,
+    claim: document.getElementById('fnClaim').value||null,
+    debunk: document.getElementById('fnDebunk').value||null,
+    personality_id: document.getElementById('fnPersonality').value||null,
+    verdict: document.getElementById('fnVerdict').value,
+    severity: document.getElementById('fnSeverity').value,
+    sources
+  };
+  const r = await api(id ? `/api/admin/fake-news/${id}` : '/api/admin/fake-news', id?'PUT':'POST', payload);
+  if (r.error) { toast(r.error, true); return; }
+  toast(id ? 'Updated' : 'Added');
+  closeModal('fakenews');
+  document.getElementById('fnEditId').value = '';
+  document.getElementById('fnModalTitle').textContent = 'Add Fake News Entry';
+  loadFakeNews();
+}
+
+async function deleteFakeNews(id) {
+  if (!confirm('Delete this entry?')) return;
+  const r = await api(`/api/admin/fake-news/${id}`, 'DELETE');
+  if (r.error) toast(r.error, true); else { toast('Deleted'); loadFakeNews(); }
+}
+
+// ── SOURCES ───────────────────────────────────────────────────────
+async function loadSources() {
+  const rows = await api('/api/admin/sources');
+  document.getElementById('srcCount').textContent = `${Array.isArray(rows)?rows.length:0} sources`;
+  document.getElementById('sourcesBody').innerHTML = (Array.isArray(rows)?rows:[]).map(s => `
+    <tr>
+      <td><span class="source-status ${s.is_active?'active':'inactive'}"></span></td>
+      <td><div style="font-weight:500;">${esc(s.label||'Unlabeled')}</div><div style="font-size:11px;color:var(--ink4);max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(s.url)}</div></td>
+      <td>${esc(s.personality_name||'—')}</td>
+      <td>${s.type||'rss'}</td>
+      <td>${s.fetch_interval||60}m</td>
+      <td style="font-size:11px;color:var(--ink4);">${s.last_fetched?fmtDate(s.last_fetched):'Never'}</td>
+      <td style="display:flex;gap:6px;align-items:center;">
+        <button class="btn btn-outline btn-sm" onclick="manualFetch(${s.id},this)" title="Fetch now">↻ Fetch</button>
+        <button class="btn-icon edit" onclick="editSource(${s.id})" title="Edit">✏️</button>
+        <button class="btn-icon danger" onclick="deleteSource(${s.id})" title="Delete">🗑</button>
+      </td>
+    </tr>`).join('') || '<tr><td colspan="7" class="empty">No sources yet — add RSS feeds per personality</td></tr>';
+}
+
+async function manualFetch(id, btn) {
+  btn.disabled = true; btn.textContent = '…';
+  const r = await api(`/api/admin/sources/${id}/fetch`, 'POST');
+  btn.disabled = false; btn.textContent = '↻ Fetch';
+  if (r.error) toast(r.error, true); else toast(`Fetched — ${r.articles_added} new articles`);
+  loadSources();
+}
+
+function editSource(id) {
+  api('/api/admin/sources').then(rows => {
+    const s = (rows||[]).find(x => x.id === id);
+    if (!s) return;
+    document.getElementById('srcModalTitle').textContent = 'Edit Source';
+    document.getElementById('srcEditId').value = s.id;
+    document.getElementById('srcUrl').value = s.url;
+    document.getElementById('srcLabel').value = s.label||'';
+    document.getElementById('srcPersonality').value = s.personality_id||'';
+    document.getElementById('srcType').value = s.type||'rss';
+    document.getElementById('srcInterval').value = s.fetch_interval||60;
+    document.getElementById('srcActive').checked = !!s.is_active;
+    openModal('source');
+  });
+}
+
+async function saveSource() {
+  const id = document.getElementById('srcEditId').value;
+  const payload = {
+    url: document.getElementById('srcUrl').value,
+    label: document.getElementById('srcLabel').value||null,
+    personality_id: document.getElementById('srcPersonality').value||null,
+    type: document.getElementById('srcType').value,
+    fetch_interval: parseInt(document.getElementById('srcInterval').value)||60,
+    is_active: document.getElementById('srcActive').checked?1:0
+  };
+  const r = await api(id ? `/api/admin/sources/${id}` : '/api/admin/sources', id?'PUT':'POST', payload);
+  if (r.error) { toast(r.error, true); return; }
+  toast(id ? 'Source updated' : 'Source added');
+  closeModal('source');
+  document.getElementById('srcEditId').value = '';
+  document.getElementById('srcModalTitle').textContent = 'Add News Source';
+  loadSources();
+}
+
+async function deleteSource(id) {
+  if (!confirm('Delete this source?')) return;
+  const r = await api(`/api/admin/sources/${id}`, 'DELETE');
+  if (r.error) toast(r.error, true); else { toast('Source deleted'); loadSources(); }
+}
+
+// ── CATEGORIES ────────────────────────────────────────────────────
+async function loadCategories() {
+  const rows = await api('/api/admin/categories');
+  document.getElementById('categoriesBody').innerHTML = (Array.isArray(rows)?rows:[]).map(c => `
+    <tr>
+      <td><div style="width:20px;height:20px;border-radius:50%;background:${c.color};display:inline-block;"></div></td>
+      <td style="font-weight:500;">${esc(c.name)}</td>
+      <td><button class="btn-icon danger" onclick="deleteCategory(${c.id},'${esc(c.name)}')" title="Delete">🗑</button></td>
+    </tr>`).join('') || '<tr><td colspan="3" class="empty">No categories</td></tr>';
+}
+
+async function saveCategory() {
+  const name = document.getElementById('catName').value.trim();
+  const color = document.getElementById('catColor').value;
+  if (!name) return;
+  const r = await api('/api/admin/categories', 'POST', { name, color });
+  if (r.error) { toast(r.error, true); return; }
+  toast('Category added'); closeModal('category');
+  document.getElementById('catName').value = '';
+  await loadGlobals(); loadCategories();
+}
+
+async function deleteCategory(id, name) {
+  if (!confirm(`Delete category "${name}"?`)) return;
+  const r = await api(`/api/admin/categories/${id}`, 'DELETE');
+  if (r.error) toast(r.error, true); else { toast('Category deleted'); await loadGlobals(); loadCategories(); }
+}
+
+// ── REACTIONS ─────────────────────────────────────────────────────
+let currentScope = 'platform';
+
+async function loadReactions() {
+  const r = await api('/api/admin/reaction-controls');
+  const g = r.global;
+  if (g) {
+    document.getElementById('killToggle').checked = !!g.enabled;
+    const sp = document.getElementById('killStatus');
+    sp.textContent = g.enabled ? 'ALL REACTIONS ON' : 'ALL REACTIONS OFF';
+    sp.className = `status-pill ${g.enabled?'on':'off'}`;
+  }
+  loadPersonalityRCList(r.byPersonality||[]);
+  loadBlockedUsers(r.byUser||[]);
+}
+
+async function toggleKillSwitch(enabled) {
+  const r = await api('/api/admin/reaction-controls/global', 'PUT', { enabled });
+  if (r.error) toast(r.error, true);
+  else { toast(enabled ? 'Reactions enabled' : 'All reactions disabled'); loadReactions(); }
+}
+
+function setScope(scope, el) {
+  currentScope = scope;
+  document.querySelectorAll('.scope-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  ['platform','personality','user'].forEach(s => {
+    document.getElementById(`scopePanel-${s}`).style.display = s===scope ? 'block' : 'none';
+  });
+}
+
+function loadPersonalityRCList(rows) {
+  document.getElementById('personalityRCList').innerHTML = rows.map(rc => `
+    <tr>
+      <td>${esc(rc.target_name||'—')}</td>
+      <td><span class="status-pill ${rc.enabled?'on':'off'}">${rc.enabled?'ON':'OFF'}</span></td>
+      <td>${rc.blocked_types && rc.blocked_types!=='[]' ? JSON.parse(rc.blocked_types).join(', ') : '—'}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="removePersonalityRC(${rc.target_id})">Remove</button></td>
+    </tr>`).join('') || '<tr><td colspan="4" class="empty">No overrides set</td></tr>';
+}
+
+async function loadPersonalityRC() {
+  const pid = document.getElementById('rcPersonalitySelect').value;
+  if (!pid) { document.getElementById('personalityRCPanel').innerHTML = ''; return; }
+  const r = await api('/api/admin/reaction-controls');
+  const existing = (r.byPersonality||[]).find(x => x.target_id == pid);
+  document.getElementById('personalityRCPanel').innerHTML = `
+    <div style="display:flex;align-items:center;gap:14px;padding:14px;background:var(--cream);border-radius:var(--r);">
+      <div class="toggle-wrap"><span class="toggle-label">Reactions enabled</span>
+        <label class="toggle"><input type="checkbox" id="rcPEnabled" ${!existing||existing.enabled?'checked':''}><span class="toggle-slider"></span></label>
+      </div>
+      <button class="btn btn-gold btn-sm" onclick="savePersonalityRC(${pid})">Apply</button>
+    </div>`;
+}
+
+async function savePersonalityRC(pid) {
+  const enabled = document.getElementById('rcPEnabled').checked;
+  const r = await api('/api/admin/reaction-controls/personality', 'POST', { personality_id: pid, enabled });
+  if (r.error) toast(r.error, true); else { toast('Saved'); loadReactions(); }
+}
+
+async function removePersonalityRC(pid) {
+  // Unset by re-enabling
+  await api('/api/admin/reaction-controls/personality', 'POST', { personality_id: pid, enabled: true });
+  toast('Override removed'); loadReactions();
+}
+
+function loadBlockedUsers(rows) {
+  document.getElementById('blockedCount').textContent = rows.length;
+  document.getElementById('blockedUsersBody').innerHTML = rows.map(rc => `
+    <tr>
+      <td>${esc(rc.target_name||'—')}</td>
+      <td style="font-size:12px;color:var(--ink4);">${esc(rc.target_email||'—')}</td>
+      <td><button class="btn btn-outline btn-sm" onclick="unblockUser(${rc.target_id})">Unblock</button></td>
+    </tr>`).join('') || '<tr><td colspan="3" class="empty">No users currently blocked</td></tr>';
+}
+
+async function searchRCUser() {
+  const q = document.getElementById('rcUserSearch').value;
+  if (!q) { document.getElementById('rcUserResults').innerHTML = ''; return; }
+  const rows = await api(`/api/admin/users?q=${encodeURIComponent(q)}`);
+  document.getElementById('rcUserResults').innerHTML = (rows||[]).map(u => `
+    <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--cream);border-radius:var(--r);margin-bottom:6px;">
+      <div class="av-sm" style="background:${u.avatar_bg||'#1A1208'};color:${u.avatar_fg||'#fff'}">${u.initials||'?'}</div>
+      <div style="flex:1;"><div style="font-weight:500;">${esc(u.name)}</div><div style="font-size:11px;color:var(--ink4);">${esc(u.email)}</div></div>
+      <button class="btn btn-danger btn-sm" onclick="blockUser(${u.id})">Block Reactions</button>
+    </div>`).join('') || '<div class="empty">No users found</div>';
+}
+
+async function blockUser(id) {
+  const r = await api('/api/admin/reaction-controls/user/block', 'POST', { user_id: id });
+  if (r.error) toast(r.error, true); else { toast('User blocked from reacting'); loadReactions(); }
+}
+
+async function unblockUser(id) {
+  const r = await api('/api/admin/reaction-controls/user/unblock', 'POST', { user_id: id });
+  if (r.error) toast(r.error, true); else { toast('User unblocked'); loadReactions(); }
+}
+
+// ── AUDIT LOG ─────────────────────────────────────────────────────
+async function loadAuditLog() {
+  const entity = document.getElementById('auditEntityFilter')?.value||'';
+  const action = document.getElementById('auditActionFilter')?.value||'';
+  const r = await api(`/api/admin/audit-log?page=${auditPage}&limit=50&entity_type=${entity}&action=${action}`);
+  const rows = r.data || [];
+  document.getElementById('auditCount').textContent = `${r.total||0} entries`;
+  document.getElementById('auditBody').innerHTML = rows.map(a => {
+    let detail = '';
+    try { const d = JSON.parse(a.detail||'{}'); detail = Object.entries(d).map(([k,v])=>`<span style="color:var(--ink4);">${k}:</span> ${esc(String(v))}`).join(' · '); } catch {}
+    return `<tr>
+      <td style="font-size:11px;color:var(--ink4);white-space:nowrap;">${fmtDateTime(a.created_at)}</td>
+      <td><div style="font-size:12px;">${esc(a.admin_name||'—')}</div><div style="font-size:10px;color:var(--ink4);">${esc(a.admin_email||'')}</div></td>
+      <td><span class="audit-action ${a.action}">${a.action}</span></td>
+      <td style="font-size:12px;color:var(--ink3);">${a.entity_type||'—'}${a.entity_id?` #${a.entity_id}`:''}</td>
+      <td style="font-size:11px;color:var(--ink3);max-width:280px;">${detail}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="5" class="empty">No audit entries yet</td></tr>';
+  renderPagination('auditPagination', auditPage, Math.ceil((r.total||0)/50), p => { auditPage=p; loadAuditLog(); });
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function fmtDate(d) { if (!d) return '—'; return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
+function fmtDateTime(d) { if (!d) return '—'; return new Date(d).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}); }
+
+function toast(msg, error=false) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.style.background = error ? 'var(--rust)' : 'var(--ink)';
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+function renderPagination(containerId, current, total, onPage) {
+  if (total <= 1) { document.getElementById(containerId).innerHTML = ''; return; }
+  let html = `<div class="pagination"><span class="page-info">Page ${current} of ${total}</span>`;
+  html += `<button class="page-btn" ${current===1?'disabled':''} onclick="(${onPage})(${current-1})">←</button>`;
+  for (let i=Math.max(1,current-2); i<=Math.min(total,current+2); i++) {
+    html += `<button class="page-btn ${i===current?'active':''}" onclick="(${onPage})(${i})">${i}</button>`;
+  }
+  html += `<button class="page-btn" ${current===total?'disabled':''} onclick="(${onPage})(${current+1})">→</button></div>`;
+  document.getElementById(containerId).innerHTML = html;
+}
+
+function debounce(fn, ms) {
+  let t;
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
+
+// Close modal on overlay click
+document.querySelectorAll('.modal-overlay').forEach(o => {
+  o.addEventListener('click', e => { if (e.target===o) o.classList.remove('open'); });
+});
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => { if (e.key==='Escape') document.querySelectorAll('.modal-overlay.open').forEach(o=>o.classList.remove('open')); });
+
+// ── INIT ──────────────────────────────────────────────────────────
+initApp();
+</script>
+</body>
+</html>
