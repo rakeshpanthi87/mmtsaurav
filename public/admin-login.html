@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>MMT Admin Login Test</title>
+  <style>
+    body { font-family: sans-serif; padding: 40px; background: #1A1208; color: #FFF8E7; }
+    .box { background: #2B1F0A; border-radius: 12px; padding: 32px; max-width: 420px; margin: 60px auto; }
+    h2 { color: #C9963A; }
+    input { width: 100%; padding: 12px; margin: 8px 0 16px; border-radius: 8px; border: 1px solid #C9963A; background: #1A1208; color: #FFF8E7; box-sizing: border-box; font-size: 14px; }
+    button { width: 100%; padding: 14px; background: #C9963A; color: #1A1208; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; }
+    button:hover { background: #E5B84A; }
+    .err { background: #7A2A1A; padding: 12px; border-radius: 8px; margin-top: 12px; display: none; }
+    .ok { background: #2A7A3A; padding: 12px; border-radius: 8px; margin-top: 12px; display: none; }
+    .info { color: #C9963A; font-size: 12px; margin-top: 20px; }
+    pre { background: #1A1208; padding: 12px; border-radius: 8px; font-size: 11px; overflow-x: auto; margin-top: 12px; }
+  </style>
+</head>
+<body>
+<div class="box">
+  <h2>🧵 MakeMyThread — Admin Login Test</h2>
+  <input type="email" id="email" value="admin@mmt.com" placeholder="Email">
+  <input type="password" id="pwd" value="admin123" placeholder="Password">
+  <button onclick="doTest()">🚀 Test Login</button>
+  <div class="err" id="errBox"></div>
+  <div class="ok" id="okBox"></div>
+  <pre id="debug"></pre>
+  <div class="info">
+    <strong>Admin credentials:</strong><br>
+    admin@mmt.com / admin123<br>
+    <br>
+    <strong>Test accounts:</strong><br>
+    demo@makemythread.com / demo123456<br>
+    test@makemythread.com / test123456<br>
+    testlogin@makemythread.com / test123456
+  </div>
+</div>
+<script>
+async function doTest() {
+  const email = document.getElementById('email').value.trim();
+  const pwd = document.getElementById('pwd').value;
+  const errBox = document.getElementById('errBox');
+  const okBox = document.getElementById('okBox');
+  const debug = document.getElementById('debug');
+  errBox.style.display = 'none';
+  okBox.style.display = 'none';
+  debug.textContent = 'Testing...\n';
+  
+  try {
+    // Step 1: Login
+    const r1 = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: pwd })
+    });
+    const d1 = await r1.json();
+    debug.textContent = `POST /api/auth/login\nStatus: ${r1.status}\nResponse: ${JSON.stringify(d1, null, 2)}\n\n`;
+    
+    if (!r1.ok) {
+      errBox.style.display = 'block';
+      errBox.textContent = 'Login failed: ' + (d1.error || 'Unknown error');
+      return;
+    }
+    
+    okBox.style.display = 'block';
+    okBox.textContent = `✅ Login success!\nWelcome, ${d1.user?.name} (${d1.user?.role})`;
+    
+    const token = d1.token;
+    
+    // Step 2: Test with token
+    const r2 = await fetch('/api/auth/me', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const d2 = await r2.json();
+    debug.textContent += `GET /api/auth/me\nStatus: ${r2.status}\nUser: ${JSON.stringify(d2.user, null, 2)}\n\n`;
+    
+    // Step 3: Load personalities
+    const r3 = await fetch('/api/personalities?limit=3', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const d3 = await r3.json();
+    debug.textContent += `GET /api/personalities?limit=3\nStatus: ${r3.status}\nCount: ${Array.isArray(d3) ? d3.length : 'N/A'}\n`;
+    if (Array.isArray(d3)) {
+      d3.slice(0,3).forEach(p => debug.textContent += ` - ${p.name} (${p.category})\n`);
+    }
+    
+    // Step 4: Load news
+    const r4 = await fetch('/api/news?limit=3', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const d4 = await r4.json();
+    debug.textContent += `\nGET /api/news?limit=3\nStatus: ${r4.status}\nCount: ${Array.isArray(d4) ? d4.length : 'N/A'}\n`;
+    if (Array.isArray(d4)) {
+      d4.slice(0,3).forEach(n => debug.textContent += ` - ${(n.headline||n.title||'').slice(0,60)}\n`);
+    }
+    
+    // Save token to localStorage
+    localStorage.setItem('mmt_token', token);
+    debug.textContent += `\n✅ Token saved to localStorage!`;
+    
+  } catch(e) {
+    errBox.style.display = 'block';
+    errBox.textContent = 'Network error: ' + e.message;
+    debug.textContent += '\n❌ Error: ' + e.message;
+  }
+}
+
+// Auto-run on load
+doTest();
+</script>
+</body>
+</html>

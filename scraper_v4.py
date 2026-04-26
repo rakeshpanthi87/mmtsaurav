@@ -309,61 +309,90 @@ class ScraperV4:
             'source':            source_name or 'Unknown',
         }
 
-    # ── SOURCE 1: GNews (async, batched, rate-limit aware) ─────
-    async def fetch_gnews(self, client, target):
-        """Fetch GNews with:
-          • Single combined query per personality (reduces API calls 3x)
-          • Rate-limit backoff (429 = wait 60s, don't spam)
-          • Max 20 results per personality per run
+    # ── SOURCE 1: GNews (chunked batch, concurrent, rate-limit aware) ──
+    async def fetch_gnews_all(self, client):
+        """Fetch GNews using chunked batch queries.
+        GNews max query = 200 chars. We use ~15 terms + " Nepal" per query.
+        Terms are grouped and fetched concurrently (3 at a time).
         """
         if not GNEWS_KEY:
-            log.info(f'  [GNews] No API key — skipping')
+            log.info('[GNews] No API key — skipping')
             return 0, 0
 
-        added = 0
-        fetched = 0
+        # Collect all primary search terms
+        all_primary_terms = []
+        for t in TARGETS:
+            if t.get('search_terms'):
+                all_primary_terms.append(t['search_terms'][0])
 
-        # Combine all search terms into ONE query per personality (free tier friendly)
-        terms = target['search_terms'][:3]
-        combined_query = ' OR '.join(f'"{t}"' for t in terms)
+        # Split into chunks of 15 (each ~100 chars + " Nepal" = ~115 chars, safe under 200)
+        chunk_size = 15
+        chunks = [all_primary_terms[i:i+chunk_size] for i in range(0, len(all_primary_terms), chunk_size)]
+        log.info(f'[GNews] {len(TARGETS)} personalities → {len(chunks)} batches')
 
-        params = {
-            'q': combined_query,
-            'lang': 'en',
-            'max': 20,          # increased but still capped
-            'token': GNEWS_KEY,
-            'sortby': 'publishedAt',
-        }
+        async def fetch_chunk(chunk_terms, chunk_idx):
+            # Add Nepal filter, join with OR
+            query = ' OR '.join(f'"{t}"' for t in chunk_terms) + ' Nepal'
+            if len(query) > 190:
+                query = ' OR '.join(f'"{t}"' for t in chunk_terms[:12]) + ' Nepal'
+            params = {
+                'q': query,
+                'lang': 'en',
+                'max': 20,
+                'token': GNEWS_KEY,
+                'sortby': 'publishedAt',
+            }
+            url = 'https://gnews.io/api/v4/search?' + urlencode(params)
 
-        url = 'https://gnews.io/api/v4/search?' + urlencode(params)
+            for attempt in range(2):
+                try:
+                    resp = await client.get(url)
+                    if resp is None:
+                        log.warning(f'[GNews] chunk {chunk_idx+1} network failure')
+                        return []
+                    if resp.status_code == 429:
+                        log.warning(f'[GNews] chunk {chunk_idx+1} rate-limited — waiting 65s')
+                        await asyncio.sleep(65)
+                        continue
+                    if resp.status_code != 200:
+                        log.warning(f'[GNews] chunk {chunk_idx+1} HTTP {resp.status_code}')
+                        return []
+                    articles = resp.json().get('articles', [])
+                    log.info(f'[GNews] chunk {chunk_idx+1}/{len(chunks)}: {len(articles)} articles')
+                    return articles
+                except Exception as e:
+                    log.error(f'[GNews] chunk {chunk_idx+1} error: {e}')
+                    return []
+            return []
 
-        # Retry once after 60s if rate-limited
-        for attempt in range(2):
-            try:
-                resp = await client.get(url)
+        # Fetch chunks concurrently, 3 at a time
+        all_articles = []
+        for i in range(0, len(chunks), 3):
+            batch = chunks[i:i+3]
+            results = await asyncio.gather(*[fetch_chunk(c, i+j) for j, c in enumerate(batch)])
+            for articles in results:
+                all_articles.extend(articles)
+            # Small delay between batches to be polite
+            if i + 3 < len(chunks):
+                await asyncio.sleep(1)
 
-                if resp is None:
-                    log.warning(f'  [GNews] Network failure for {target["name_en"]}')
-                    break
+        log.info(f'[GNews] Total fetched: {len(all_articles)} articles')
 
-                if resp.status_code == 429:
-                    log.warning(f'  [GNews] Rate limited (429) — waiting 65s before retry...')
-                    await asyncio.sleep(65)
-                    continue  # retry the same URL
+        # Match articles to personalities by keyword
+        matched = 0
+        for a in all_articles:
+            title = a.get('title', '') or ''
+            desc = a.get('description', '') or ''
+            text = (title + ' ' + desc).lower()
 
-                if resp.status_code != 200:
-                    log.warning(f'  [GNews] {resp.status_code} for "{target["name_en"]}"')
-                    break
-
-                data = resp.json()
-                articles = data.get('articles', [])
-                fetched = len(articles)
-
-                for a in articles:
+            for target in TARGETS:
+                kws = [k.lower() for k in target.get('keywords', [])]
+                slug_kw = target['slug'].replace('-', ' ').lower()
+                if any(kw in text for kw in kws + [slug_kw, target['name_en'].lower()]):
                     art = self._make_article(
                         target,
-                        a.get('title', ''),
-                        a.get('description', ''),
+                        title,
+                        desc,
                         a.get('content', ''),
                         a.get('source', {}).get('name', 'GNews'),
                         a.get('url', ''),
@@ -372,18 +401,11 @@ class ScraperV4:
                     )
                     if self._is_new_url(art['source_url']):
                         self.articles.append(art)
-                        added += 1
+                        matched += 1
+                    break
 
-                log.info(f'  [GNews] {target["name_en"]}: {fetched} fetched, {added} new (from combined query)')
-                break  # success or non-429 error — don't retry
-
-            except Exception as e:
-                log.error(f'  [GNews] Error: {e}')
-                break
-
-        self.stats['gnews_fetched'] += fetched
-        self.stats['gnews_new'] += added
-        return fetched, added
+        log.info(f'[GNews] {matched} new articles matched to personalities')
+        return 0, matched
 
     # ── SOURCE 2: PINews (with DNS pre-check) ───────────────────
     async def fetch_pinews(self, client, target):
@@ -524,11 +546,8 @@ class ScraperV4:
             tasks = []
 
             if use_apis:
-                for target in TARGETS:
-                    log.info(f'\n── {target["name_en"]} ({target["name"]}) ──')
-                    tasks.append(self.fetch_gnews(client, target))
-                    tasks.append(self.fetch_pinews(client, target))
-                    await asyncio.sleep(0.5)  # stagger to avoid rate limiting
+                log.info(f'\n── GNews Batch ({len(TARGETS)} personalities) ──')
+                tasks.append(self.fetch_gnews_all(client))
 
             if use_rss:
                 log.info('\n── RSS Feeds ──')

@@ -4,9 +4,13 @@
 FINAL NEWS SCRAPER v3.2
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Sources (in order of preference):
-  1. GNews API    — targeted search by personality name (cleanest data)
-  2. PINews API   — supplemental API coverage
-  3. RSS feeds    — 8 Nepali outlets (broad fallback coverage)
+  1. GNews API     — targeted search by personality name (cleanest data)
+  2. NewsData.io   — real-time news API (pub_e0fed32fe9ff41d985da6297729b5726)
+  3. NewsAPI.org   — global news coverage (6b5856851f6e40ada902001dfc069158)
+  4. Serper.dev    — Google search results API (1e3eb2d6d6889bff1c5793a29fdb8654399d4ef1)
+  5. TheNewsAPI    — structured news data (6bLJaKvNAq7CQywg8DUxoSemT5U7pbvhpiT6qT15)
+  6. PINews API    — supplemental API coverage
+  7. RSS feeds     — 8 Nepali outlets (broad fallback coverage)
 
 All results merged, deduplicated by URL, then pushed to backend.
 
@@ -26,7 +30,7 @@ Environment variables:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """
 
-import sys, io, os, json, hashlib, time, argparse
+import sys, io, os, json, hashlib, time, argparse, ast
 from datetime import datetime
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
@@ -43,9 +47,62 @@ API_SECRET      = os.environ.get('MMT_API_SECRET',    '')
 GNEWS_KEY       = os.environ.get('GNEWS_API_KEY',     '243261f5ab25fecc02d80e82d3859d20')
 PINEWS_KEY      = os.environ.get('PINEWS_API_KEY',    '6b5856851f6e40ada902001dfc069158')
 PINEWS_ENDPOINT = os.environ.get('PINEWS_ENDPOINT',   'https://api.apinews.net/news')
+# New sources
+NEWSDATA_KEY    = os.environ.get('NEWSDATA_API_KEY',  'pub_e0fed32fe9ff41d985da6297729b5726')
+NEWSAPI_KEY     = os.environ.get('NEWSAPI_KEY',       '6b5856851f6e40ada902001dfc069158')
+SERPER_KEY      = os.environ.get('SERPER_API_KEY',    '1e3eb2d6d6889bff1c5793a29fdb8654399d4ef1')
+THENEWSAPI_KEY  = os.environ.get('THENEWSAPI_KEY',   '6bLJaKvNAq7CQywg8DUxoSemT5U7pbvhpiT6qT15')
 
 # ── Personalities ─────────────────────────────────────────────────
-TARGETS = [
+# TARGETS loaded dynamically from API when --from-api is used
+# Falls back to hardcoded list below
+TARGETS = []
+
+def load_targets_from_api():
+    """Fetch personalities from MMT backend API instead of using hardcoded list."""
+    import requests
+    secret = os.environ.get('MMT_API_SECRET', os.environ.get('SCRAPER_SECRET', ''))
+    if not secret:
+        print('[API] MMT_API_SECRET not set — using hardcoded targets')
+        return False
+
+    try:
+        resp = requests.get(
+            f'{API_URL}/api/scraper/personalities',
+            headers={'x-scraper-secret': secret},
+            timeout=15
+        )
+        if resp.status_code != 200:
+            print(f'[API] Failed to fetch personalities: {resp.status_code}')
+            return False
+        personas = resp.json()
+        if not personas:
+            print('[API] No personalities returned — using hardcoded targets')
+            return False
+
+        global TARGETS
+        TARGETS = []
+        for p in personas:
+            terms = p.get('search_terms', [])
+            if isinstance(terms, str):
+                try: terms = json.loads(terms)
+                except: terms = [terms]
+            TARGETS.append({
+                'name':        p.get('name_local') or p.get('name', ''),
+                'name_en':     p.get('name', ''),
+                'slug':        p.get('slug', ''),
+                'search_terms': terms,
+                'category':    p.get('category') or 'politician',
+                'bio':         p.get('bio') or '',
+            })
+        print(f'[API] Loaded {len(TARGETS)} personalities from backend')
+        return True
+    except Exception as e:
+        print(f'[API] Error loading personalities: {e} — using hardcoded targets')
+        return False
+
+# Default hardcoded personalities (used if --from-api fails or not set)
+_hardcoded_targets = [
     {
         'name':       'बालेन शाह',
         'name_en':    'Balen Shah',
@@ -253,6 +310,165 @@ class ScraperV32:
         s_en = any(s.lower() in text_lo for s in surnames if is_en(s))
         return (f_ne and s_ne) or (f_en and s_en)
 
+
+    # ── NewsData.io ───────────────────────────────────────────────
+    def fetch_newsdata(self, target):
+        if not NEWSDATA_KEY:
+            print(f'  [NewsData] No API key')
+            return
+        for term in target.get('search_terms', []):
+            try:
+                url = 'https://newsdata.io/api/1/news'
+                params = {
+                    'apikey': NEWSDATA_KEY,
+                    'q': term,
+                    'language': 'en',
+                    'size': 10
+                }
+                r = requests.get(url, params=params, timeout=10)
+                if r.status_code != 200:
+                    print(f'  [NewsData] Error {r.status_code} for "{term}"')
+                    continue
+                data = r.json()
+                for article in (data.get('results') or []):
+                    self.articles.append({
+                        'headline': article.get('title', ''),
+                        'summary': article.get('description', ''),
+                        'source': article.get('source_id', ''),
+                        'link': article.get('link', ''),
+                        'published': article.get('pubDate', ''),
+                        'category': target.get('category', 'general'),
+                        'personality_name_en': target.get('name_en', ''),
+                        'personality_name': target.get('name', ''),
+                        'personality_slug': target.get('slug', ''),
+                        'source_name': article.get('source_name', article.get('source_id', '')),
+                        'source_url': article.get('link', ''),
+                        'img_color': '#DBEAFE',
+                        'is_breaking': False
+                    })
+                print(f'  [NewsData] "{term}" → {len(data.get("results", []))} results')
+            except Exception as e:
+                print(f'  [NewsData] Exception for "{term}": {e}')
+            time.sleep(0.5)
+
+    # ── NewsAPI.org ────────────────────────────────────────────────
+    def fetch_newsapi(self, target):
+        if not NEWSAPI_KEY:
+            print(f'  [NewsAPI] No API key')
+            return
+        for term in target.get('search_terms', []):
+            try:
+                url = 'https://newsapi.org/v2/everything'
+                params = {
+                    'apiKey': NEWSAPI_KEY,
+                    'q': term,
+                    'language': 'en',
+                    'pageSize': 10,
+                    'sortBy': 'publishedAt'
+                }
+                r = requests.get(url, params=params, timeout=10)
+                if r.status_code != 200:
+                    print(f'  [NewsAPI] Error {r.status_code} for "{term}"')
+                    continue
+                data = r.json()
+                for article in (data.get('articles') or []):
+                    self.articles.append({
+                        'headline': article.get('title', ''),
+                        'summary': article.get('description', ''),
+                        'source': article.get('source', {}).get('name', ''),
+                        'link': article.get('url', ''),
+                        'published': article.get('publishedAt', ''),
+                        'category': target.get('category', 'general'),
+                        'personality_name_en': target.get('name_en', ''),
+                        'personality_name': target.get('name', ''),
+                        'personality_slug': target.get('slug', ''),
+                        'source_name': article.get('source', {}).get('name', ''),
+                        'source_url': article.get('url', ''),
+                        'img_color': '#DBEAFE',
+                        'is_breaking': False
+                    })
+                print(f'  [NewsAPI] "{term}" → {len(data.get("articles", []))} results')
+            except Exception as e:
+                print(f'  [NewsAPI] Exception for "{term}": {e}')
+            time.sleep(0.5)
+
+    # ── Serper.dev ────────────────────────────────────────────────
+    def fetch_serper(self, target):
+        if not SERPER_KEY:
+            print(f'  [Serper] No API key')
+            return
+        for term in target.get('search_terms', []):
+            try:
+                url = 'https://google.serper.dev/search'
+                payload = {'q': term, 'num': 10}
+                headers = {'X-API-KEY': SERPER_KEY, 'Content-Type': 'application/json'}
+                r = requests.post(url, json=payload, headers=headers, timeout=10)
+                if r.status_code != 200:
+                    print(f'  [Serper] Error {r.status_code} for "{term}"')
+                    continue
+                data = r.json()
+                for item in (data.get('organic', []) or [])[:10]:
+                    snippet = item.get('snippet', '')
+                    self.articles.append({
+                        'headline': item.get('title', ''),
+                        'summary': snippet,
+                        'source': item.get('source', ''),
+                        'link': item.get('link', ''),
+                        'published': item.get('date', ''),
+                        'category': target.get('category', 'general'),
+                        'personality_name_en': target.get('name_en', ''),
+                        'personality_name': target.get('name', ''),
+                        'personality_slug': target.get('slug', ''),
+                        'source_name': item.get('source', ''),
+                        'source_url': item.get('link', ''),
+                        'img_color': '#DBEAFE',
+                        'is_breaking': False
+                    })
+                print(f'  [Serper] "{term}" → {len(data.get("organic", [])[:10])} results')
+            except Exception as e:
+                print(f'  [Serper] Exception for "{term}": {e}')
+            time.sleep(0.5)
+
+    # ── TheNewsAPI ────────────────────────────────────────────────
+    def fetch_thenewsapi(self, target):
+        if not THENEWSAPI_KEY:
+            print(f'  [TheNewsAPI] No API key')
+            return
+        for term in target.get('search_terms', []):
+            try:
+                url = 'https://api.thenewsapi.com/v1/news/all'
+                params = {
+                    'api_token': THENEWSAPI_KEY,
+                    'q': term,
+                    'language': 'en',
+                    'page_size': 10
+                }
+                r = requests.get(url, params=params, timeout=10)
+                if r.status_code != 200:
+                    print(f'  [TheNewsAPI] Error {r.status_code} for "{term}"')
+                    continue
+                data = r.json()
+                for article in (data.get('results') or []):
+                    self.articles.append({
+                        'headline': article.get('title', ''),
+                        'summary': article.get('description', ''),
+                        'source': article.get('source', {}).get('name', ''),
+                        'link': article.get('url', ''),
+                        'published': article.get('published_at', ''),
+                        'category': target.get('category', 'general'),
+                        'personality_name_en': target.get('name_en', ''),
+                        'personality_name': target.get('name', ''),
+                        'personality_slug': target.get('slug', ''),
+                        'source_name': article.get('source', {}).get('name', ''),
+                        'source_url': article.get('url', ''),
+                        'img_color': '#DBEAFE',
+                        'is_breaking': False
+                    })
+                print(f'  [TheNewsAPI] "{term}" → {len(data.get("results", []))} results')
+            except Exception as e:
+                print(f'  [TheNewsAPI] Exception for "{term}": {e}')
+            time.sleep(0.5)
+
     def fetch_rss_all(self):
         total = 0
         for source_name, feed_url in RSS_FEEDS.items():
@@ -292,6 +508,15 @@ class ScraperV32:
             for target in TARGETS:
                 print(f'\n── {target["name_en"]} ({target["name"]}) ──')
                 self.fetch_gnews(target)
+                time.sleep(0.5)
+                self.fetch_newsdata(target)
+                time.sleep(0.5)
+                self.fetch_newsapi(target)
+                time.sleep(0.5)
+                self.fetch_serper(target)
+                time.sleep(0.5)
+                self.fetch_thenewsapi(target)
+                time.sleep(0.5)
                 self.fetch_pinews(target)
                 time.sleep(1)
 
@@ -415,10 +640,18 @@ if __name__ == '__main__':
     p.add_argument('--rss-only', action='store_true', help='Skip news APIs, use RSS only')
     p.add_argument('--api-url',  default=None)
     p.add_argument('--secret',   default=None)
+    p.add_argument('--from-api', action='store_true', help='Fetch personalities from MMT API instead of hardcoded list')
     args = p.parse_args()
 
     if args.api_url: API_URL    = args.api_url
     if args.secret:  API_SECRET = args.secret
+
+    # Load personalities from API if --from-api flag is set
+    if args.from_api:
+        print('[MODE] Fetching personalities from backend API (--from-api)')
+        load_targets_from_api()
+    else:
+        print('[MODE] Using hardcoded personality list (use --from-api to fetch from backend)')
 
     scraper = ScraperV32(output_dir='scraped_data')
 

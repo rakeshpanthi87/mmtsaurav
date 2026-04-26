@@ -21,6 +21,7 @@ function formatPersonality(p, userId) {
     bio: p.bio || '',
     avatarInitials: p.initials || p.name.slice(0,2).toUpperCase(),
     avatarColor: p.avatar_bg || '#C9963A',
+    avatarFg: p.avatar_fg || '#fff',
     isBreaking: !!p.is_breaking,
     followersCount: followers,
     newsCount,
@@ -30,6 +31,8 @@ function formatPersonality(p, userId) {
     nameLocal: p.name_local || null,
     verified: !!p.verified,
     createdAt: p.created_at,
+    bgInfo: p.bg_info || null,
+    searchTerms: p.search_terms || null,
   };
 }
 

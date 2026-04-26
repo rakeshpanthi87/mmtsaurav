@@ -1,12 +1,11 @@
 /**
  * services/newsIngestion.js
  *
- * Three parallel news sources per cron run:
- *   1. GNews API  — targeted search by personality name (structured)
- *   2. PINews API — supplemental search  
+ * News ingestion — three parallel sources per cron run:
+ *   1. GNews API  — chunked batch queries (all 182 personalities, ~40s total)
+ *   2. PINews API — chunked batch queries
  *   3. RSS feeds  — broad coverage from 8 Nepali outlets
  *
- * Each article is auto-categorised by OpenRouter free model before insert.
  * Deduplication via source_url UNIQUE constraint in DB.
  */
 
@@ -17,35 +16,24 @@ const { categoriseArticle } = require('./aiRouter');
 
 const rssParser = new Parser({ timeout: 10000 });
 
-function getPersonalities() {
-  return db.prepare('SELECT * FROM personalities').all();
-}
+// ── Helpers ───────────────────────────────────────────────────────
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// ── GNews API ─────────────────────────────────────────────────────
-// Docs: https://gnews.io/docs/v4
+// ── GNews batch ───────────────────────────────────────────────────
 async function fetchGNews(personality) {
   const key = process.env.GNEWS_API_KEY;
   if (!key) return [];
-
   const queries = [personality.name];
   if (personality.name_local) queries.push(personality.name_local);
-
   const articles = [];
   for (const q of queries) {
     try {
       const url = `https://gnews.io/api/v4/search?q=${encodeURIComponent(`"${q}"`)}&lang=en&max=10&sortby=publishedAt&token=${key}`;
       const resp = await fetch(url, { signal: AbortSignal.timeout(15000) });
-      if (!resp.ok) { console.warn(`[GNews] ${resp.status} for "${q}"`); continue; }
+      if (!resp.ok) { console.warn(`  [GNews] ${resp.status} for "${q}"`); continue; }
       const data = await resp.json();
       for (const a of (data.articles || [])) {
-        articles.push({
-          title:        a.title,
-          snippet:      a.description  || '',
-          full_content: a.content      || a.description || '',
-          source_name:  a.source?.name || 'GNews',
-          source_url:   a.url,
-          published_at: a.publishedAt,
-        });
+        articles.push({ title: a.title, snippet: a.description || '', full_content: a.content || a.description || '', source_name: a.source?.name || 'GNews', source_url: a.url, published_at: a.publishedAt });
       }
       console.log(`  [GNews] "${q}" → ${data.articles?.length || 0} articles`);
     } catch (e) { console.warn(`  [GNews] "${q}": ${e.message}`); }
@@ -53,68 +41,108 @@ async function fetchGNews(personality) {
   return articles;
 }
 
-// ── PINews API ────────────────────────────────────────────────────
-async function fetchPINews(personality) {
+// Chunked batch GNews — all personalities in parallel chunks of 5, 3s gaps
+async function fetchGNewsAll(personalities) {
+  const key = process.env.GNEWS_API_KEY;
+  if (!key) { console.log('[GNews] No API key'); return []; }
+
+  // Build 15-term chunks (safe under 200-char query limit)
+  const allArticles = [];
+  const chunks = [];
+  for (let i = 0; i < personalities.length; i += 5) {
+    chunks.push(personalities.slice(i, i + 5));
+  }
+  console.log(`[GNews] ${personalities.length} personalities → ${chunks.length} batches (5 per batch)`);
+
+  for (let ci = 0; ci < chunks.length; ci++) {
+    const chunk = chunks[ci];
+    // Build OR query from chunk names
+    const names = chunk.map(p => `"${p.name}"`).join(' OR ') + ' Nepal';
+    const url   = `https://gnews.io/api/v4/search?q=${encodeURIComponent(names)}&lang=en&max=10&sortby=publishedAt&token=${key}`;
+    try {
+      const resp = await fetch(url, { signal: AbortSignal.timeout(15000) });
+      if (resp.status === 429) {
+        console.log(`  [GNews] batch ${ci+1}/${chunks.length} rate-limited — waiting 65s`);
+        await sleep(65000);
+        // Retry once after wait
+        const r2 = await fetch(url, { signal: AbortSignal.timeout(15000) });
+        if (!r2.ok) { console.warn(`  [GNews] batch ${ci+1} HTTP ${r2.status} after retry`); }
+        else {
+          const d = await r2.json();
+          console.log(`  [GNews] batch ${ci+1}/${chunks.length}: ${(d.articles||[]).length} articles`);
+          for (const a of (d.articles || [])) {
+            allArticles.push({ title: a.title, snippet: a.description||'', full_content: a.content||a.description||'', source_name: a.source?.name||'GNews', source_url: a.url, published_at: a.publishedAt });
+          }
+        }
+      } else if (!resp.ok) {
+        console.warn(`  [GNews] batch ${ci+1} HTTP ${resp.status}`);
+      } else {
+        const data = await resp.json();
+        console.log(`  [GNews] batch ${ci+1}/${chunks.length}: ${(data.articles||[]).length} articles`);
+        for (const a of (data.articles || [])) {
+          allArticles.push({ title: a.title, snippet: a.description||'', full_content: a.content||a.description||'', source_name: a.source?.name||'GNews', source_url: a.url, published_at: a.publishedAt });
+        }
+      }
+    } catch (e) { console.warn(`  [GNews] batch ${ci+1} error: ${e.message}`); }
+    // 3s gap between batches to avoid rate limiting
+    if (ci < chunks.length - 1) await sleep(3000);
+  }
+  return allArticles;
+}
+
+// ── PINews batch ─────────────────────────────────────────────────
+async function fetchPINewsAll(personalities) {
   const key      = process.env.PINEWS_API_KEY;
   const endpoint = process.env.PINEWS_ENDPOINT || 'https://api.apinews.net/news';
   if (!key) return [];
-
-  const queries = [personality.name];
-  if (personality.name_local) queries.push(personality.name_local);
-
-  const articles = [];
-  for (const q of queries) {
-    try {
-      const url = `${endpoint}?q=${encodeURIComponent(q)}&apiKey=${key}&language=en&pageSize=10`;
-      const resp = await fetch(url, { signal: AbortSignal.timeout(15000) });
-      if (!resp.ok) { console.warn(`  [PINews] ${resp.status} for "${q}"`); continue; }
-      const data = await resp.json();
-      // Handle different response shapes across API versions
-      const items = data.articles || data.results || data.data || [];
-      for (const a of items) {
-        articles.push({
-          title:        a.title       || a.headline    || '',
-          snippet:      a.description || a.summary     || '',
-          full_content: a.content     || a.body        || a.description || '',
-          source_name:  (typeof a.source === 'string' ? a.source : a.source?.name) || 'PINews',
-          source_url:   a.url         || a.link        || '',
-          published_at: a.publishedAt || a.pubDate     || new Date().toISOString(),
-        });
-      }
-      console.log(`  [PINews] "${q}" → ${items.length} articles`);
-    } catch (e) { console.warn(`  [PINews] "${q}": ${e.message}`); }
+  const allArticles = [];
+  const chunks = [];
+  for (let i = 0; i < personalities.length; i += 15) {
+    chunks.push(personalities.slice(i, i + 15));
   }
-  return articles;
+  console.log(`[PINews] ${personalities.length} personalities → ${chunks.length} batches`);
+
+  for (let ci = 0; ci < chunks.length; ci++) {
+    const chunk = chunks[ci];
+    for (const p of chunk) {
+      for (const q of [p.name, p.name_local].filter(Boolean)) {
+        try {
+          const url = `${endpoint}?q=${encodeURIComponent(q)}&apiKey=${key}&language=en&pageSize=10`;
+          const resp = await fetch(url, { signal: AbortSignal.timeout(15000) });
+          if (!resp.ok) continue;
+          const data = await resp.json();
+          const items = data.articles || data.results || data.data || [];
+          for (const a of items) {
+            allArticles.push({ title: a.title||a.headline||'', snippet: a.description||a.summary||'', full_content: a.content||a.body||a.description||'', source_name: (typeof a.source === 'string' ? a.source : a.source?.name)||'PINews', source_url: a.url||a.link||'', published_at: a.publishedAt||a.pubDate||new Date().toISOString() });
+          }
+        } catch {}
+      }
+      await sleep(1000);
+    }
+  }
+  return allArticles;
 }
 
-// ── RSS source (DB-managed, called by admin manual fetch too) ─────
+// ── RSS source ────────────────────────────────────────────────────
 async function fetchSource(source) {
   if (source.type !== 'rss') return 0;
   let feed;
   try { feed = await rssParser.parseURL(source.url); }
-  catch (e) { console.warn(`[RSS] ${e.message}`); return 0; }
+  catch (e) { console.warn(`[RSS] ${source.name}: ${e.message}`); return 0; }
 
-  const personality = source.personality_id
-    ? db.prepare('SELECT * FROM personalities WHERE id=?').get(source.personality_id)
-    : null;
-
+  const personality = source.personality_id ? db.prepare('SELECT * FROM personalities WHERE id=?').get(source.personality_id) : null;
   let added = 0;
   for (const item of (feed.items || []).slice(0, 15)) {
     const title = item.title?.trim();
     if (!title) continue;
     if (db.prepare('SELECT id FROM news WHERE source_url=?').get(item.link)) continue;
-
     const snippet  = (item.contentSnippet || item.summary || '').slice(0, 500);
     const category = await categoriseArticle(title, snippet).catch(() => 'general');
     const pubAt    = item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString();
-
     const r = db.prepare(
-      `INSERT OR IGNORE INTO news
-         (personality_id, source_id, title, snippet, source_name, source_url, category, published_at)
+      `INSERT OR IGNORE INTO news (personality_id, source_id, title, snippet, source_name, source_url, category, published_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(source.personality_id || null, source.id, title, snippet,
-          feed.title || 'RSS', item.link || '', category, pubAt);
-
+    ).run(source.personality_id || null, source.id, title, snippet, feed.title || 'RSS', item.link || '', category, pubAt);
     if (r.changes > 0) added++;
   }
   db.prepare('UPDATE news_sources SET last_fetched=CURRENT_TIMESTAMP WHERE id=?').run(source.id);
@@ -122,7 +150,7 @@ async function fetchSource(source) {
   return added;
 }
 
-// ── Insert helper (GNews + PINews both use this) ──────────────────
+// ── Insert helper ─────────────────────────────────────────────────
 const COLOR_MAP = {
   politics:'#DBEAFE', sports:'#D1FAE5', business:'#FEF3C7',
   technology:'#EDE9FE', health:'#D1FAE5', social:'#FCE7F3',
@@ -134,24 +162,12 @@ async function insertArticles(articles, personalityId) {
   for (const a of articles) {
     if (!a.title || !a.source_url) continue;
     if (db.prepare('SELECT id FROM news WHERE source_url=?').get(a.source_url)) continue;
-
     const category = await categoriseArticle(a.title, a.snippet).catch(() => 'general');
     const r = db.prepare(
       `INSERT OR IGNORE INTO news
-         (personality_id, title, snippet, full_content, source_name, source_url,
-          category, credibility, is_breaking, img_color, published_at)
+         (personality_id, title, snippet, full_content, source_name, source_url, category, credibility, is_breaking, img_color, published_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, 88, 0, ?, ?)`
-    ).run(
-      personalityId,
-      a.title,
-      (a.snippet || '').slice(0, 500),
-      (a.full_content || '').slice(0, 10000),
-      a.source_name,
-      a.source_url,
-      category,
-      COLOR_MAP[category] || '#DBEAFE',
-      a.published_at || new Date().toISOString()
-    );
+    ).run(personalityId, a.title, (a.snippet||'').slice(0,500), (a.full_content||'').slice(0,10000), a.source_name, a.source_url, category, COLOR_MAP[category]||'#DBEAFE', a.published_at || new Date().toISOString());
     if (r.changes > 0) inserted++;
   }
   return inserted;
@@ -161,43 +177,69 @@ async function insertArticles(articles, personalityId) {
 function pushSSE(personalityId, personName) {
   try {
     const { notifyFollowers } = require('../routes/sse');
-    const followers = db.prepare('SELECT user_id FROM follows WHERE personality_id=?')
-      .all(personalityId).map(r => r.user_id);
+    const followers = db.prepare('SELECT user_id FROM follows WHERE personality_id=?').all(personalityId).map(r => r.user_id);
     if (followers.length && personName) notifyFollowers(followers, personName, 'New articles');
   } catch {}
 }
 
 // ── Main run ──────────────────────────────────────────────────────
 async function runAll() {
-  const personalities = getPersonalities();
+  const personalities = db.prepare('SELECT * FROM personalities').all();
   if (!personalities.length) {
-    console.log('[News] No personalities in DB — add them via admin panel');
+    console.log('[News] No personalities in DB');
     return;
   }
 
   console.log(`\n[News] ${new Date().toLocaleTimeString()} — ${personalities.length} personalities`);
+
+  // Run GNews and PINews in parallel (each handles all personalities internally)
+  const [gnewsArticles, pinewsArticles] = await Promise.all([
+    fetchGNewsAll(personalities),
+    fetchPINewsAll(personalities),
+  ]);
+  console.log(`[News] GNews: ${gnewsArticles.length} articles, PINews: ${pinewsArticles.length} articles`);
+
+  // Distribute articles to personalities by keyword matching
   let total = 0;
-
+  const slugIndex = {};
   for (const p of personalities) {
-    console.log(`  ${p.name}`);
-
-    const [gnews, pinews] = await Promise.all([fetchGNews(p), fetchPINews(p)]);
-    const gc = await insertArticles(gnews, p.id);
-    const pc = await insertArticles(pinews, p.id);
-    if (gc + pc > 0) pushSSE(p.id, p.name);
-    total += gc + pc;
-
-    await new Promise(r => setTimeout(r, 1500)); // rate limit pause
+    slugIndex[p.slug] = p.id;
   }
 
-  // RSS sources from DB
+  // Match GNews articles
+  for (const a of gnewsArticles) {
+    const text = (a.title + ' ' + a.snippet).toLowerCase();
+    let matched = false;
+    for (const p of personalities) {
+      const kws = (p.name + ' ' + (p.name_local || '') + ' ' + p.slug).toLowerCase().split(/[\s\-]+/);
+      if (kws.some(kw => kw.length > 3 && text.includes(kw))) {
+        const inserted = await insertArticles([a], p.id);
+        if (inserted > 0) { total++; pushSSE(p.id, p.name); }
+        matched = true;
+        break;
+      }
+    }
+  }
+
+  // Match PINews articles
+  for (const a of pinewsArticles) {
+    const text = (a.title + ' ' + a.snippet).toLowerCase();
+    for (const p of personalities) {
+      const kws = (p.name + ' ' + (p.name_local || '') + ' ' + p.slug).toLowerCase().split(/[\s\-]+/);
+      if (kws.some(kw => kw.length > 3 && text.includes(kw))) {
+        const inserted = await insertArticles([a], p.id);
+        if (inserted > 0) { total++; pushSSE(p.id, p.name); }
+        break;
+      }
+    }
+  }
+
+  // RSS sources
   const sources = db.prepare('SELECT * FROM news_sources WHERE is_active=1').all();
   for (const src of sources) {
-    const mins = src.last_fetched
-      ? (Date.now() - new Date(src.last_fetched).getTime()) / 60000 : Infinity;
+    const mins = src.last_fetched ? (Date.now() - new Date(src.last_fetched).getTime()) / 60000 : Infinity;
     if (mins >= (src.fetch_interval || 60)) {
-      const c = await fetchSource(src);
-      total += c;
+      total += await fetchSource(src);
     }
   }
 
@@ -211,4 +253,4 @@ function startCron() {
   setTimeout(() => runAll().catch(() => {}), 8000);
 }
 
-module.exports = { startCron, fetchSource, runAll, fetchGNews, fetchPINews };
+module.exports = { startCron, fetchSource, runAll, fetchGNews, fetchPINewsAll };

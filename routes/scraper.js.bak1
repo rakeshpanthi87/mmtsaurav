@@ -246,11 +246,7 @@ router.get('/personalities', scraperAuth, (req, res) => {
 router.get('/config', scraperAuth, (req, res) => {
   res.json({
     gnews_api_key: process.env.GNEWS_API_KEY || '',
-    newsdata_api_key: process.env.NEWSDATA_KEY || '',
-    newsapi_api_key: process.env.NEWSAPI_KEY || '',
-    serper_api_key: process.env.SERPER_KEY || '',
-    thenewsapi_key: process.env.THENEWSAPI_KEY || '',
-    scrape_sources: ['newsdata', 'newsapi', 'serper', 'thenewsapi', 'gnews', 'pininews', 'rss'],
+    scrape_sources: ['gnews', 'pininews', 'rss'],  // future: make configurable
     default_language: 'en',
     default_page_size: 10
   });

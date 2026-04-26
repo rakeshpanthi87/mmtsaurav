@@ -825,6 +825,22 @@ async function loadPersonalities() {
 
 function openModal(type) {
   document.getElementById(`modal-${type}`).classList.add('open');
+  if (type === 'personality') {
+    document.getElementById('pEditId').value = '';
+    document.getElementById('pModalTitle').textContent = 'Add Personality';
+    document.getElementById('pName').value = '';
+    document.getElementById('pNameLocal').value = '';
+    document.getElementById('pSlug').value = '';
+    document.getElementById('pCategory').value = '';
+    document.getElementById('pNationality').value = '';
+    document.getElementById('pBio').value = '';
+    document.getElementById('pBgInfo').value = '';
+    document.getElementById('pSearchTerms').value = '';
+    document.getElementById('pAvatarBg').value = '#C9963A';
+    document.getElementById('pAvatarFg').value = '#ffffff';
+    document.getElementById('pInitials').value = '';
+    document.getElementById('pVerified').checked = false;
+  }
 }
 function closeModal(type) {
   document.getElementById(`modal-${type}`).classList.remove('open');
